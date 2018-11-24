@@ -2,8 +2,8 @@ package database
 
 import (
 	"github.com/ninjadotorg/constant/common"
-	"github.com/ninjadotorg/constant/transaction"
 	"github.com/ninjadotorg/constant/privacy-protocol"
+	"github.com/ninjadotorg/constant/transaction"
 )
 
 // DatabaseInterface provides the interface that is used to store blocks.
@@ -68,6 +68,10 @@ type DatabaseInterface interface {
 
 	// Crowdsale
 	SaveCrowdsaleData([]byte, []byte, string, string, uint64, privacy.PaymentAddress) error // param: saleID, bondID, baseAsset, quoteAsset, price, escrowAccount
+
+	//Vote
+	AddVoteDCBBoard(string, uint64) error
+	AddVoteGOVBoard(string, uint64) error
 
 	Close() error
 }

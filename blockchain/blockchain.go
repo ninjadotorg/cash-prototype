@@ -7,6 +7,7 @@ import (
 	"errors"
 	"sort"    //"strconv"
 	"strings" //"fmt"
+
 	//"time"
 	"sync"
 
@@ -518,6 +519,30 @@ func (self *BlockChain) UpdateDividendPayout(block *Block) error {
 	return nil
 }
 
+func (self *BlockChain) UpdateVoteCountBoard(block *Block) error {
+	for _, tx := range block.Transactions {
+		switch tx.GetType() {
+		case common.TxVoteDCBBoard:
+			{
+				tx := tx.(*transaction.TxVoteDCBBoard)
+				err := self.config.DataBase.AddVoteDCBBoard(tx.VoteDCBBoardData.CandidatePubKey, tx.TxTokenData.Amount)
+				if err != nil {
+					return err
+				}
+			}
+		case common.TxVoteGOVBoard:
+			{
+				tx := tx.(*transaction.TxVoteGOVBoard)
+				err := self.config.DataBase.AddVoteGOVBoard(tx.VoteGOVBoardData.CandidatePubKey, tx.TxTokenData.Amount)
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
+}
+
 func (self *BlockChain) ProcessCrowdsaleTxs(block *Block) error {
 	for _, tx := range block.Transactions {
 		switch tx.GetType() {
@@ -721,7 +746,7 @@ func (self *BlockChain) GetListTxByReadonlyKey(keySet *cashec.KeySet) (map[byte]
 	return results, nil
 }
 
-func (self *BlockChain) DecryptTxByKey(txInBlock transaction.Transaction, nullifiersInDb [][]byte, keys *cashec.KeySet) (transaction.Tx) {
+func (self *BlockChain) DecryptTxByKey(txInBlock transaction.Transaction, nullifiersInDb [][]byte, keys *cashec.KeySet) transaction.Tx {
 	tx := txInBlock.(*transaction.Tx)
 	copyTx := transaction.Tx{
 		Version:         tx.Version,
