@@ -143,7 +143,6 @@ func (self *Block) AddTransaction(tx transaction.Transaction) error {
 /*
 Hash creates a hash from block data
 */
-
 func (self Block) Hash() *common.Hash {
 	if self.blockHash != nil {
 		return self.blockHash

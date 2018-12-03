@@ -46,7 +46,7 @@ type ElCParams struct {
 	G [CM_CAPACITY]EllipticPoint // generators
 	// G[0]: the first component's commitment
 	// G[1]: public key
-	// G[2]: Value
+	// G[2]: VoteAmount
 	// G[3]: SerialNumber
 	// G[4]: Random
 }
@@ -301,10 +301,10 @@ func (com ElCParams) TestFunction(testCode byte) bool {
 		value2 := RandBytes(32)
 		value3 := RandBytes(32)
 		valuer := RandBytes(32)
-		fmt.Println("Value 1: ", value1)
-		fmt.Println("Value 2: ", value2)
-		fmt.Println("Value 3: ", value3)
-		fmt.Println("Value r: ", valuer)
+		fmt.Println("VoteAmount 1: ", value1)
+		fmt.Println("VoteAmount 2: ", value2)
+		fmt.Println("VoteAmount 3: ", value3)
+		fmt.Println("VoteAmount r: ", valuer)
 
 		//Compute commitment for all value, 4 is value of constant CM_CAPACITY
 		commitmentAll := Elcm.Commit([CM_CAPACITY - 1][]byte{value1, value2, value3, valuer})
@@ -315,8 +315,8 @@ func (com ElCParams) TestFunction(testCode byte) bool {
 		//Generate 2 random value
 		value1 := RandBytes(32)
 		valuer := RandBytes(32)
-		fmt.Println("Value 1: ", value1)
-		fmt.Println("Value r: ", valuer)
+		fmt.Println("VoteAmount 1: ", value1)
+		fmt.Println("VoteAmount r: ", valuer)
 
 		//Compute commitment for special value with index 0
 		commitmentSpec := Elcm.CommitSpecValue(value1, valuer, 0)

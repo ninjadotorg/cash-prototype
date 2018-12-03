@@ -520,12 +520,14 @@ func (self *BlockChain) UpdateDividendPayout(block *Block) error {
 }
 
 func (self *BlockChain) UpdateVoteCountBoard(block *Block) error {
+	DCBEndedBlock := block.Header.DCBGovernor.EndBlock
+	GOVEndedBlock := block.Header.GOVGovernor.EndBlock
 	for _, tx := range block.Transactions {
 		switch tx.GetType() {
 		case common.TxVoteDCBBoard:
 			{
 				tx := tx.(*transaction.TxVoteDCBBoard)
-				err := self.config.DataBase.AddVoteDCBBoard(tx.VoteDCBBoardData.CandidatePubKey, tx.TxTokenData.Amount)
+				err := self.config.DataBase.AddVoteDCBBoard(DCBEndedBlock, string(tx.TxTokenData.Vins[0].PaymentAddress.Pk), tx.VoteDCBBoardData.CandidatePubKey, tx.TxTokenData.Amount)
 				if err != nil {
 					return err
 				}
@@ -533,7 +535,7 @@ func (self *BlockChain) UpdateVoteCountBoard(block *Block) error {
 		case common.TxVoteGOVBoard:
 			{
 				tx := tx.(*transaction.TxVoteGOVBoard)
-				err := self.config.DataBase.AddVoteGOVBoard(tx.VoteGOVBoardData.CandidatePubKey, tx.TxTokenData.Amount)
+				err := self.config.DataBase.AddVoteGOVBoard(GOVEndedBlock, string(tx.TxTokenData.Vins[0].PaymentAddress.Pk), tx.VoteGOVBoardData.CandidatePubKey, tx.TxTokenData.Amount)
 				if err != nil {
 					return err
 				}
@@ -675,7 +677,7 @@ func (self *BlockChain) GetListTxByReadonlyKey(keySet *cashec.KeySet) (map[byte]
 						LockTime: tx.LockTime,
 						Descs:    make([]*transaction.JoinSplitDesc, 0),
 					}
-					// try to decrypt each of desc in tx with readonly Key and add to txsInBlockAccepted
+					// try to decrypt each of desc in tx with readonly PubKey and add to txsInBlockAccepted
 					listDesc := make([]*transaction.JoinSplitDesc, 0)
 					for _, desc := range tx.Descs {
 						copyDesc := &transaction.JoinSplitDesc{
@@ -758,7 +760,7 @@ func (self *BlockChain) DecryptTxByKey(txInBlock transaction.Transaction, nullif
 		Descs:           make([]*transaction.JoinSplitDesc, 0),
 		AddressLastByte: tx.AddressLastByte,
 	}
-	// try to decrypt each of desc in tx with readonly Key and add to txsInBlockAccepted
+	// try to decrypt each of desc in tx with readonly PubKey and add to txsInBlockAccepted
 	listDesc := make([]*transaction.JoinSplitDesc, 0)
 	for _, desc := range tx.Descs {
 		copyDesc := &transaction.JoinSplitDesc{

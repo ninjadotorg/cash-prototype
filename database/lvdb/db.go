@@ -33,8 +33,12 @@ var (
 	tokenInitPrefix           = []byte("token-init-")
 	loanIDKeyPrefix           = []byte("loanID-")
 	loanTxKeyPrefix           = []byte("loanTx-")
-	voteDCBBoardPrefix        = []byte("votedcbboard-")
-	voteGOVBoardPrefix        = []byte("votegovboard-")
+	VoteDCBBoardSumPrefix     = []byte("votedcbsumboard-")
+	VoteGOVBoardSumPrefix     = []byte("votegovsumboard-")
+	VoteDCBBoardCountPrefix   = []byte("votedcbcountboard-")
+	VoteGOVBoardCountPrefix   = []byte("votegovcountboard-")
+	VoteDCBBoardListPrefix    = []byte("votedcblistboard-")
+	VoteGOVBoardListPrefix    = []byte("votegovlistboard-")
 	loanRequestPostfix        = []byte("-req")
 	loanResponsePostfix       = []byte("-res")
 	rewared                   = []byte("reward")
@@ -70,7 +74,7 @@ func (db *db) put(key, value []byte) error {
 	return nil
 }
 
-func (db db) getKey(keyType string, key interface{}) []byte {
+func (db db) GetKey(keyType string, key interface{}) []byte {
 	var dbkey []byte
 	switch keyType {
 	case string(blockKeyPrefix):
@@ -86,9 +90,23 @@ func (db db) getKey(keyType string, key interface{}) []byte {
 	case string(tokenInitPrefix):
 		dbkey = append(tokenInitPrefix, key.(*common.Hash)[:]...)
 	case string(voteDCBBoardPrefix):
-		dbkey = append(voteDCBBoardPrefix, common.ToBytes(key.(string))...)
+		postfix := []byte(key.(string))
+		dbkey = append(voteDCBBoardPrefix, postfix...)
 	case string(voteGOVBoardPrefix):
-		dbkey = append(voteGOVBoardPrefix, common.ToBytes(key.(string))...)
+		postfix := []byte(key.(string))
+		dbkey = append(voteGOVBoardPrefix, postfix...)
 	}
 	return dbkey
+}
+
+// get real PubKey from dbkey
+func (db db) reverseGetKey(keyType string, dbkey []byte) interface{} {
+	var key interface{}
+	switch keyType {
+	case string(voteDCBBoardPrefix):
+		key = string(dbkey[len(voteDCBBoardPrefix):])
+	case string(voteGOVBoardPrefix):
+		key = string(dbkey[len(voteGOVBoardPrefix):])
+	}
+	return key
 }

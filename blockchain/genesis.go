@@ -3,12 +3,13 @@ package blockchain
 import (
 	"time"
 
+	"log"
+
 	"github.com/ninjadotorg/constant/common"
 	"github.com/ninjadotorg/constant/privacy-protocol"
 	"github.com/ninjadotorg/constant/privacy-protocol/client"
 	"github.com/ninjadotorg/constant/transaction"
 	"github.com/ninjadotorg/constant/wallet"
-	"log"
 )
 
 type GenesisBlockGenerator struct {
@@ -32,7 +33,7 @@ func (self GenesisBlockGenerator) CalcMerkleRoot(txns []transaction.Transaction)
 	rho := [32]byte{byte(idx)}
 	r := [32]byte{byte(idx)}
 	note := &client.Note{
-		Value: 0,
+		VoteAmount: 0,
 		Apk:   addr.Pk,
 		Rho:   rho[:],
 		R:     r[:],
@@ -44,7 +45,7 @@ func (self GenesisBlockGenerator) CalcMerkleRoot(txns []transaction.Transaction)
 	spendingKey := &privacy.SpendingKey{} // SpendingKey for input of genesis transaction is 0x0
 	input := new(client.JSInput)
 	input.InputNote = createGenesisInputNote(spendingKey, idx)
-	input.Key = spendingKey
+	input.PubKey = spendingKey
 	input.WitnessPath = (&client.MerklePath{}).CreateDummyPath()
 	return input
 }*/
@@ -64,8 +65,8 @@ Use to get hardcode for genesis block
 	if err != nil {
 		return nil, err
 	}
-	outNote := &client.Note{Value: initialCoin, Apk: key.KeySet.PaymentAddress.Pk}
-	placeHolderOutputNote := &client.Note{Value: 0, Apk: key.KeySet.PaymentAddress.Pk}
+	outNote := &client.Note{VoteAmount: initialCoin, Apk: key.KeySet.PaymentAddress.Pk}
+	placeHolderOutputNote := &client.Note{VoteAmount: 0, Apk: key.KeySet.PaymentAddress.Pk}
 
 	fmt.Printf("EncKey: %x\n", key.KeySet.PaymentAddress.Tk)
 
@@ -369,6 +370,26 @@ func (self GenesisBlockGenerator) CreateGenesisBlockPoSParallel(
 		key.KeySet.PaymentAddress,
 	)
 	genesisBlock.AddTransaction(&bondTokenTx)
+
+	// Create genesis vote token tx for DCB
+	VoteDCBTokenTx := createSpecialTokenTx(
+		common.Hash(VoteDCBTokenID),
+		"Bond",
+		"BON",
+		icoParams.InitialVoteDCBToken,
+		key.KeySet.PaymentAddress,
+	)
+	genesisBlock.AddTransaction(&VoteDCBTokenTx)
+
+	// Create genesis vote token tx for GOV
+	VoteGOVTokenTx := createSpecialTokenTx(
+		common.Hash(VoteGOVTokenID),
+		"Bond",
+		"BON",
+		icoParams.InitialVoteGOVToken,
+		key.KeySet.PaymentAddress,
+	)
+	genesisBlock.AddTransaction(&VoteGOVTokenTx)
 
 	// calculate merkle root tx for genesis block
 	genesisBlock.Header.MerkleRoot = self.CalcMerkleRoot(genesisBlock.Transactions)

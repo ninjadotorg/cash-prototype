@@ -176,7 +176,7 @@ func CreateTx(
 	var value uint64
 	for _, p := range paymentInfo {
 		value += p.Amount
-		fmt.Printf("[CreateTx] paymentInfo.Value: %+v, paymentInfo.PaymentAddress: %x\n", p.Amount, p.PaymentAddress.Pk)
+		fmt.Printf("[CreateTx] paymentInfo.VoteAmount: %+v, paymentInfo.PaymentAddress: %x\n", p.Amount, p.PaymentAddress.Pk)
 	}
 
 	type ChainNote struct {
@@ -192,7 +192,7 @@ func CreateTx(
 				for _, note := range desc.Note {
 					chainNote := &ChainNote{note: note, chainID: chainID}
 					inputNotes = append(inputNotes, chainNote)
-					fmt.Printf("[CreateTx] inputNote.Value: %+v\n", note.Value)
+					fmt.Printf("[CreateTx] inputNote.VoteAmount: %+v\n", note.Value)
 				}
 			}
 		}
@@ -473,11 +473,11 @@ func (tx *Tx) buildJSDescAndEncrypt(
 	fmt.Printf("ephemeralPubKey: %x\n", *ephemeralPubKey)
 	fmt.Printf("tranmissionKey[0]: %x\n", keys[0])
 	fmt.Printf("tranmissionKey[1]: %x\n", keys[1])
-	fmt.Printf("notes[0].Value: %+v\n", notes[0].Value)
+	fmt.Printf("notes[0].VoteAmount: %+v\n", notes[0].Value)
 	fmt.Printf("notes[0].Rho: %x\n", notes[0].Rho)
 	fmt.Printf("notes[0].R: %x\n", notes[0].R)
 	fmt.Printf("notes[0].Memo: %+v\n", notes[0].Memo)
-	fmt.Printf("notes[1].Value: %+v\n", notes[1].Value)
+	fmt.Printf("notes[1].VoteAmount: %+v\n", notes[1].Value)
 	fmt.Printf("notes[1].Rho: %x\n", notes[1].Rho)
 	fmt.Printf("notes[1].R: %x\n", notes[1].R)
 	fmt.Printf("notes[1].Memo: %+v\n", notes[1].Memo)

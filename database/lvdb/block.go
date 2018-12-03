@@ -20,9 +20,9 @@ func (db *db) StoreBlock(v interface{}, chainID byte) error {
 	var (
 		hash = h.Hash()
 		key  = append(append(chainIDPrefix, chainID), append(blockKeyPrefix, hash[:]...)...)
-		// key should look like this c10{b-[blockhash]}:{b-[blockhash]}
+		// PubKey should look like this c10{b-[blockhash]}:{b-[blockhash]}
 		keyB = append(blockKeyPrefix, hash[:]...)
-		// key should look like this {b-blockhash}:block
+		// PubKey should look like this {b-blockhash}:block
 	)
 	if ok, _ := db.hasValue(key); ok {
 		return database.NewDatabaseError(database.BlockExisted, errors.Errorf("block %s already exists", hash.String()))
@@ -45,9 +45,9 @@ func (db *db) StoreBlockHeader(v interface{}, hash *common.Hash, chainID byte) e
 	//fmt.Println("Log in StoreBlockHeader", v, hash, chainID)
 	var (
 		key = append(append(chainIDPrefix, chainID), append(blockKeyPrefix, hash[:]...)...)
-		// key should look like this c10{bh-[blockhash]}:{bh-[blockhash]}
+		// PubKey should look like this c10{bh-[blockhash]}:{bh-[blockhash]}
 		keyB = append(blockKeyPrefix, hash[:]...)
-		// key should look like this {bh-blockhash}:block
+		// PubKey should look like this {bh-blockhash}:block
 	)
 	if ok, _ := db.hasValue(key); ok {
 		return database.NewDatabaseError(database.BlockExisted, errors.Errorf("block %s already exists", hash.String()))
@@ -67,7 +67,7 @@ func (db *db) StoreBlockHeader(v interface{}, hash *common.Hash, chainID byte) e
 }
 
 func (db *db) HasBlock(hash *common.Hash) (bool, error) {
-	exists, err := db.hasValue(db.getKey(string(blockKeyPrefix), hash))
+	exists, err := db.hasValue(db.GetKey(string(blockKeyPrefix), hash))
 	if err != nil {
 		return false, err
 	} else {
@@ -76,7 +76,7 @@ func (db *db) HasBlock(hash *common.Hash) (bool, error) {
 }
 
 func (db *db) FetchBlock(hash *common.Hash) ([]byte, error) {
-	block, err := db.lvdb.Get(db.getKey(string(blockKeyPrefix), hash), nil)
+	block, err := db.lvdb.Get(db.GetKey(string(blockKeyPrefix), hash), nil)
 	if err != nil {
 		return nil, database.NewDatabaseError(database.UnexpectedError, errors.Wrap(err, "db.lvdb.Get"))
 	}
@@ -85,13 +85,13 @@ ret := make([]byte, len(block)) copy(ret, block) return ret, nil
 
 func (db *db) DeleteBlock(hash *common.Hash, idx int32, chainID byte) error {
 	// Delete block
-	err := db.lvdb.Delete(db.getKey(string(blockKeyPrefix), hash), nil)
+	err := db.lvdb.Delete(db.GetKey(string(blockKeyPrefix), hash), nil)
 	if err != nil {
 		return database.NewDatabaseError(database.UnexpectedError, errors.Wrap(err, "db.lvdb.Get"))
 	}
 
 	// Delete block index
-	err = db.lvdb.Delete(db.getKey(string(blockKeyIdxPrefix), hash), nil)
+	err = db.lvdb.Delete(db.GetKey(string(blockKeyIdxPrefix), hash), nil)
 	if err != nil {
 		return database.NewDatabaseError(database.UnexpectedError, errors.Wrap(err, "db.lvdb.Get"))
 	}
@@ -142,7 +142,7 @@ func (db *db) StoreBlockIndex(h *common.Hash, idx int32, chainID byte) error {
 	binary.LittleEndian.PutUint32(buf, uint32(idx))
 	buf[4] = chainID
 	//{i-[hash]}:index-chainid
-	if err := db.lvdb.Put(db.getKey(string(blockKeyIdxPrefix), h), buf, nil); err != nil {
+	if err := db.lvdb.Put(db.GetKey(string(blockKeyIdxPrefix), h), buf, nil); err != nil {
 		return database.NewDatabaseError(database.UnexpectedError, errors.Wrap(err, "db.lvdb.put"))
 	}
 	//{index-chainid}:[hash]
@@ -153,7 +153,7 @@ func (db *db) StoreBlockIndex(h *common.Hash, idx int32, chainID byte) error {
 }
 
 func (db *db) GetIndexOfBlock(h *common.Hash) (int32, byte, error) {
-	b, err := db.lvdb.Get(db.getKey(string(blockKeyIdxPrefix), h), nil)
+	b, err := db.lvdb.Get(db.GetKey(string(blockKeyIdxPrefix), h), nil)
 	//{i-[hash]}:index-chainid
 	if err != nil {
 		return 0, 0, database.NewDatabaseError(database.UnexpectedError, errors.Wrap(err, "db.lvdb.get"))
@@ -163,9 +163,7 @@ func (db *db) GetIndexOfBlock(h *common.Hash) (int32, byte, error) {
 	var chainID byte
 	if err := binary.Read(bytes.NewReader(b[:4]), binary.LittleEndian, &idx); err != nil {
 		return 0, 0, database.NewDatabaseError(database.UnexpectedError, errors.Wrap(err, "binary.Read"))
-	}
-	if err = binary.Read(bytes.NewReader(b[4:]), binary.LittleEndian, &chainID); err != nil {
-		return 0, 0, database.NewDatabaseError(database.UnexpectedError, errors.Wrap(err, "binary.Read"))
+	} if err = binary.Read(bytes.NewReader(b[4:]), binary.LittleEndian, &chainID); err != nil { return 0, 0, database.NewDatabaseError(database.UnexpectedError, errors.Wrap(err, "binary.Read"))
 	}
 	return idx, chainID, nil
 }
@@ -201,7 +199,6 @@ func (db *db) FetchAllBlocks() (map[byte][]*common.Hash, error) {
 			return nil, database.NewDatabaseError(database.UnexpectedError, errors.Wrap(err, "iter.Error"))
 		}
 	}
-
 	return keys, nil
 }
 
@@ -220,56 +217,4 @@ func (db *db) FetchChainBlocks(chainID byte) ([]*common.Hash, error) {
 		return nil, database.NewDatabaseError(database.UnexpectedError, errors.Wrap(err, "iter.Error"))
 	}
 	return keys, nil
-}
-
-func (db *db) AddVoteDCBBoard(CandidatePubKey string, amount uint64) error {
-	key := db.getKey(string(voteDCBBoardPrefix), CandidatePubKey)
-	ok, err := db.hasValue(key)
-	if err!= nil {
-		return err
-	}
-	if !ok {
-		zeroInBytes := make([]byte, 8)
-		binary.LittleEndian.PutUint64(zeroInBytes, uint64(0))
-		db.put(key, zeroInBytes)
-	}
-
-	currentVoteInBytes, err := db.lvdb.Get(key, nil)
-	currentVote := binary.LittleEndian.Uint64(currentVoteInBytes)
-	newVote := currentVote + amount
-
-	newVoteInBytes  := make([]byte, 8)
-	binary.LittleEndian.PutUint64(newVoteInBytes, newVote)
-	err = db.put(key, newVoteInBytes)
-	if err != nil {
-		return database.NewDatabaseError(database.UnexpectedError, errors.Wrap(err, "db.lvdb.Get"))
-	}
-
-	return nil
-}
-
-func (db *db) AddVoteGOVBoard(CandidatePubKey string, amount uint64) error {
-	key := db.getKey(string(voteGOVBoardPrefix), CandidatePubKey)
-	ok, err := db.hasValue(key)
-	if err!= nil {
-		return err
-	}
-	if !ok {
-		zeroInBytes := make([]byte, 8)
-		binary.LittleEndian.PutUint64(zeroInBytes, uint64(0))
-		db.put(key, zeroInBytes)
-	}
-
-	currentVoteInBytes, err := db.lvdb.Get(key, nil)
-	currentVote := binary.LittleEndian.Uint64(currentVoteInBytes)
-	newVote := currentVote + amount
-
-	newVoteInBytes  := make([]byte, 8)
-	binary.LittleEndian.PutUint64(newVoteInBytes, newVote)
-	err = db.put(key, newVoteInBytes)
-	if err != nil {
-		return database.NewDatabaseError(database.UnexpectedError, errors.Wrap(err, "db.lvdb.Get"))
-	}
-
-	return nil
 }

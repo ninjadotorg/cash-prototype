@@ -2,8 +2,8 @@ package blockchain
 
 import (
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/ninjadotorg/constant/common"
@@ -91,7 +91,7 @@ func (blockgen *BlkTmplGenerator) NewBlockTemplate(payToAddress privacy.PaymentA
 	// 1. newNW < lastNW * 0.9
 	// 2. current block height == last Constitution start time + last Constitution execute duration
 	if blockgen.neededNewDCBConstitution(chainID) {
-		tx, err := blockgen.createRequestConstitutionTxDecs(chainID, DCBConstitutionHelper{})
+		tx, err := blockgen.createAcceptConstitutionTxDecs(chainID, DCBConstitutionHelper{})
 		if err != nil {
 			Logger.log.Error(err)
 			return nil, err
@@ -99,7 +99,7 @@ func (blockgen *BlkTmplGenerator) NewBlockTemplate(payToAddress privacy.PaymentA
 		sourceTxns = append(sourceTxns, tx)
 	}
 	if blockgen.neededNewGovConstitution(chainID) {
-		tx, err := blockgen.createRequestConstitutionTxDecs(chainID, GOVConstitutionHelper{})
+		tx, err := blockgen.createAcceptConstitutionTxDecs(chainID, GOVConstitutionHelper{})
 		if err != nil {
 			Logger.log.Error(err)
 			return nil, err
@@ -256,6 +256,7 @@ concludeBlock:
 	block := Block{
 		Transactions: make([]transaction.Transaction, 0),
 	}
+
 	block.Header = BlockHeader{
 		Height:                prevBlock.Header.Height + 1,
 		Version:               BlockVersion,
@@ -275,15 +276,43 @@ concludeBlock:
 	if block.Header.GOVConstitution.GOVParams.SellingBonds != nil {
 		block.Header.GOVConstitution.GOVParams.SellingBonds.BondsToSell -= bondsSold
 	}
+
+	if int32(block.Header.DCBGovernor.EndBlock) == block.Header.Height {
+		newBoardList, _ := blockgen.chain.config.DataBase.GetTopMostVoteDCBGovernor(NumberOfDCBGovernors)
+		sort.Sort(newBoardList)
+		sumOfVote := uint64(0)
+		var newDCBBoardPubKey []string
+		for _, i := range newBoardList {
+			newDCBBoardPubKey = append(newDCBBoardPubKey, i.PubKey)
+			sumOfVote += i.VoteAmount
+		}
+
+		// prepend send votetoken to txstoadd
+		txsToAdd = append([]transaction.Transaction{blockgen.createAcceptDCBBoardTx(newDCBBoardPubKey, sumOfVote)}, txsToAdd...)
+		txsToAdd = append(blockgen.CreateSendDCBVoteTokenToGovernorTx(newBoardList, sumOfVote), txsToAdd...)
+
+		// Todo @0xjackalope: send reward to board and delete them from database before send back token to new board
+
+		txsAddtoPool := blockgen.CreateSendBackDCBTokenAfterVoteInPool(block.Header.DCBGovernor.DCBBoardPubKeys, block.Header.DCBGovernor.StartAmountDCBToken)
+		//xxx add to pool
+	}
+
 	for _, tx := range txsToAdd {
 		if err := block.AddTransaction(tx); err != nil {
 			return nil, err
 		}
+		// Handle if this transaction change something in block header
 		if tx.GetType() == common.TxAcceptDCBProposal {
 			block.updateDCBConstitution(tx, blockgen)
 		}
 		if tx.GetType() == common.TxAcceptGOVProposal {
 			block.updateGOVConstitution(tx, blockgen)
+		}
+		if tx.GetType() == common.TxAcceptDCBBoard {
+			block.UpdateDCBBoard(tx)
+		}
+		if tx.GetType() == common.TxAcceptGOVBoard {
+			block.UpdateGOVBoard(tx)
 		}
 	}
 
@@ -330,71 +359,6 @@ func (blockgen *BlkTmplGenerator) neededNewGovConstitution(chainID byte) bool {
 		return true
 	}
 	return false
-}
-
-func (blockgen *BlkTmplGenerator) createRequestConstitutionTxDecs(
-	chainID byte,
-	ConstitutionHelper ConstitutionHelper,
-) (*transaction.TxDesc, error) {
-	BestBlock := blockgen.chain.BestState[chainID].BestBlock
-
-	// count vote from lastConstitution.StartedBlockHeight to Bestblock height
-	CountVote := make(map[common.Hash]int64)
-	Transaction := make(map[common.Hash]*transaction.Transaction)
-	for blockHeight := ConstitutionHelper.GetStartedBlockHeight(blockgen, chainID); blockHeight < BestBlock.Header.Height; blockHeight += 1 {
-		//retrieve block from block's height
-		hashBlock, err := blockgen.chain.config.DataBase.GetBlockByIndex(blockHeight, chainID)
-		if err != nil {
-			return nil, err
-		}
-		blockBytes, err := blockgen.chain.config.DataBase.FetchBlock(hashBlock)
-		if err != nil {
-			return nil, err
-		}
-		block := Block{}
-		err = json.Unmarshal(blockBytes, &block)
-		if err != nil {
-			return nil, err
-		}
-		//count vote of this block
-		for _, tx := range block.Transactions {
-			_, exist := CountVote[*tx.Hash()]
-			if ConstitutionHelper.CheckSubmitProposalType(tx) {
-				if exist {
-					return nil, err
-				}
-				CountVote[*tx.Hash()] = 0
-				Transaction[*tx.Hash()] = &tx
-			} else {
-				if ConstitutionHelper.CheckVotingProposalType(tx) {
-					if !exist {
-						return nil, err
-					}
-					CountVote[*tx.Hash()] += int64(ConstitutionHelper.GetAmountVoteToken(tx))
-				}
-			}
-		}
-	}
-
-	// get transaction and create transaction desc
-	var maxVote int64
-	var res common.Hash
-	for key, value := range CountVote {
-		if value > maxVote {
-			maxVote = value
-			res = key
-		}
-	}
-
-	acceptedSubmitProposalTransaction := ConstitutionHelper.TxAcceptProposal(*Transaction[res])
-
-	AcceptedTransactionDesc := transaction.TxDesc{
-		Tx:     acceptedSubmitProposalTransaction,
-		Added:  time.Now(),
-		Height: BestBlock.Header.Height,
-		Fee:    0,
-	}
-	return &AcceptedTransactionDesc, nil
 }
 
 func (blockgen *BlkTmplGenerator) processDividend(

@@ -14,12 +14,14 @@ const (
 	TxVoteGOVProposal   = "vg"  // submit GOV proposal voted tx
 	TxVoteDCBBoard      = "vbd" // vote DCB board tx
 	TxVoteGOVBoard      = "vbg" // vote DCB board tx
+	TxAcceptDCBBoard    = "adb" //accept new DCB board
+	TxAcceptGOVBoard    = "agb" //accept new GOV board
+	TxAcceptDCBProposal = "ad"  // accept DCB proposal
+	TxAcceptGOVProposal = "ag"  // accept GOV proposal
 
-	TxAcceptDCBProposal  = "ad" // accept DCB proposal
-	TxAcceptGOVProposal  = "ag" // accept GOV proposal
-	TxNormalType         = "n"  // normal tx(send and receive coin)
-	TxSalaryType         = "s"  // salary tx(gov pay salary for block producer)
-	TxCustomTokenType    = "t"  // token  tx
+	TxNormalType         = "n" // normal tx(send and receive coin)
+	TxSalaryType         = "s" // salary tx(gov pay salary for block producer)
+	TxCustomTokenType    = "t" // token  tx
 	TxLoanRequest        = "lr"
 	TxLoanResponse       = "ls"
 	TxLoanPayment        = "lp"
@@ -36,6 +38,8 @@ const (
 
 // for mining consensus
 const (
+	DurationOfTermDCB     = 1000    //number of block one DCB board in charge
+	DurationOfTermGOV     = 1000    //number of block one GOV board in charge
 	MaxBlockSize          = 5000000 //byte 5MB
 	MaxTxsInBlock         = 1000
 	MinTxsInBlock         = 10                    // minium txs for block to get immediate process (meaning no wait time)
@@ -48,6 +52,10 @@ const (
 	MinBlockSigs          = (TotalValidators / 2) + 1
 	GetChainStateInterval = 10 //second
 	MaxBlockTime          = 10 //second Maximum for a chain to grow
+
+	// voting
+	SumOfVoteDCBToken = 100000000
+	SumOfVoteGOVToken = 100000000
 )
 
 // board types

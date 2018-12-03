@@ -3,7 +3,6 @@ package common
 import (
 	"bytes"
 	"encoding/base64"
-	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -309,6 +308,5 @@ func Max(x, y int) int {
 func ToBytes(obj interface{}) []byte {
 	buff := new(bytes.Buffer)
 	json.NewEncoder(buff).Encode(obj)
-	binary.Write()
 	return buff.Bytes()
 }

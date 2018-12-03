@@ -9,14 +9,15 @@ const (
 	ThresholdRatioOfGovCrisis = 90
 
 	// Mainnet
-	Mainnet                           = 0x01
-	MainetName                        = "mainnet"
-	MainnetDefaultPort                = "9333"
-	MainnetInitFundSalary             = 0
-	MainnetInitDCBToken               = 0
-	MainnetInitGovToken               = 0
-	MainnetInitCmBToken               = 0
-	MainnetInitBondToken              = 0
+	Mainnet               = 0x01
+	MainetName            = "mainnet"
+	MainnetDefaultPort    = "9333"
+	MainnetInitFundSalary = 0
+	MainnetInitDCBToken   = 0
+	MainnetInitGovToken   = 0
+	MainnetInitCmBToken   = 0
+	MainnetInitBondToken  = 0
+	MainnetVote
 	MainnetGenesisblockPaymentAddress = "1UuyYcHgVFLMd8Qy7T1ZWRmfFvaEgogF7cEsqY98ubQjoQUy4VozTqyfSNjkjhjR85C6GKBmw1JKekgMwCeHtHex25XSKwzb9QPQ2g6a3"
 
 	// Testnet
@@ -29,6 +30,10 @@ const (
 	TestnetInitCmBToken               = 0
 	TestnetInitBondToken              = 0
 	TestnetGenesisBlockPaymentAddress = "1Uv12YEcd5w5Qm79sTGHSHYnCfVKM2ui8mbapD1dgziUf9211b5cnCSdxVb1DoXyDD19V1THMSnaAWZ18sJtmaVnh56wVhwb1HuYpkTa4"
+
+	//board and proposal parameters
+	NumberOfDCBGovernors = 50
+	NumberOfGOVGovernors = 50
 )
 
 // board addresses
@@ -39,10 +44,12 @@ var (
 
 // special token ids (aka. PropertyID in custom token)
 var (
-	DCBTokenID  = [common.HashSize]byte{1}
-	GOVTokenID  = [common.HashSize]byte{2}
-	CMBTokenID  = [common.HashSize]byte{3}
-	BondTokenID = [common.HashSize]byte{4}
+	DCBTokenID     = [common.HashSize]byte{1}
+	GOVTokenID     = [common.HashSize]byte{2}
+	CMBTokenID     = [common.HashSize]byte{3}
+	BondTokenID    = [common.HashSize]byte{4}
+	VoteDCBTokenID = [common.HashSize]byte{5}
+	VoteGOVTokenID = [common.HashSize]byte{6}
 )
 
 const (

@@ -2,8 +2,12 @@ package database
 
 import (
 	"github.com/ninjadotorg/constant/common"
+	"github.com/ninjadotorg/constant/database/lvdb"
 	"github.com/ninjadotorg/constant/privacy-protocol"
 	"github.com/ninjadotorg/constant/transaction"
+	"github.com/syndtr/goleveldb/leveldb/iterator"
+	"github.com/syndtr/goleveldb/leveldb/opt"
+	"github.com/syndtr/goleveldb/leveldb/util"
 )
 
 // DatabaseInterface provides the interface that is used to store blocks.
@@ -70,8 +74,12 @@ type DatabaseInterface interface {
 	SaveCrowdsaleData([]byte, []byte, string, string, uint64, privacy.PaymentAddress) error // param: saleID, bondID, baseAsset, quoteAsset, price, escrowAccount
 
 	//Vote
-	AddVoteDCBBoard(string, uint64) error
-	AddVoteGOVBoard(string, uint64) error
+	AddVoteDCBBoard(uint32, string, string, uint64) error
+	AddVoteGOVBoard(uint32, string, string, uint64) error
+	GetTopMostVoteDCBGovernor(uint32) (lvdb.CandidateList, error)
+	GetTopMostVoteGOVGovernor(uint32) (lvdb.CandidateList, error)
+	NewIterator(*util.Range, *opt.ReadOptions) iterator.Iterator
+	GetKey(string, interface{}) []byte
 
 	Close() error
 }

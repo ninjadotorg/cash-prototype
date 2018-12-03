@@ -24,6 +24,9 @@ const (
 const (
 	CustomTokenInit = iota
 	CustomTokenTransfer
+	InitVoteDCBToken
+	InitVoteGOVToken
 	VoteDCBBoard
 	VoteGOVBoard
+	SendBackDCBTokenVoteFail
 )
