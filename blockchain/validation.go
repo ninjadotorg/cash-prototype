@@ -6,11 +6,11 @@ Use these function to validate common data in blockchain
 
 import (
 	"bytes"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math"
 
-	"encoding/hex"
 	"github.com/ninjadotorg/constant/common"
 	"github.com/ninjadotorg/constant/privacy-protocol"
 	"github.com/ninjadotorg/constant/transaction"
@@ -110,6 +110,17 @@ func (self *BlockChain) ValidateTxLoanResponse(tx transaction.Transaction, chain
 		return fmt.Errorf("Fail parsing LoanResponse transaction")
 	}
 
+	// Check if only board members created this tx
+	isBoard := false
+	for _, gov := range self.BestState[chainID].BestBlock.Header.DCBGovernor.DCBBoardPubKeys {
+		if bytes.Equal([]byte(gov), txResponse.JSPubKey) {
+			isBoard = true
+		}
+	}
+	if !isBoard {
+		return fmt.Errorf("Tx must be created by DCB Governor")
+	}
+
 	// Check if a loan request with the same id exists on any chain
 	txHashes, err := self.config.DataBase.GetLoanTxs(txResponse.LoanID)
 	if err != nil {
@@ -126,7 +137,14 @@ func (self *BlockChain) ValidateTxLoanResponse(tx transaction.Transaction, chain
 		switch txOld.GetType() {
 		case common.TxLoanResponse:
 			{
-				return fmt.Errorf("Loan already had response")
+				txOldResp, ok := txOld.(*transaction.TxLoanResponse)
+				if !ok {
+					return fmt.Errorf("Error parsing old loan response tx")
+				}
+				// Check if the same user responses twice
+				if bytes.Equal(txOldResp.JSPubKey, txResponse.JSPubKey) {
+					return fmt.Errorf("Current user already responded to loan request")
+				}
 			}
 		case common.TxLoanRequest:
 			{
@@ -156,7 +174,7 @@ func (self *BlockChain) ValidateTxLoanPayment(tx transaction.Transaction, chainI
 	if err != nil {
 		return err
 	}
-	found := false
+	found := uint8(0)
 	for _, txHash := range txHashes {
 		hash := &common.Hash{}
 		copy(hash[:], txHash)
@@ -167,13 +185,17 @@ func (self *BlockChain) ValidateTxLoanPayment(tx transaction.Transaction, chainI
 		switch txOld.GetType() {
 		case common.TxLoanResponse:
 			{
-				found = true
+				txResponse := tx.(*transaction.TxLoanResponse)
+				if txResponse.Response == transaction.Accept {
+					found += 1
+				}
 			}
 		}
 	}
 
-	if found == false {
-		return fmt.Errorf("Corresponding loan response not found")
+	minResponse := self.BestState[chainID].BestBlock.Header.DCBConstitution.DCBParams.MinLoanResponseRequire
+	if found < minResponse {
+		return fmt.Errorf("Not enough loan accepted response")
 	}
 	return nil
 }
@@ -219,11 +241,13 @@ func (self *BlockChain) ValidateTxLoanWithdraw(tx transaction.Transaction, chain
 				if !ok {
 					return fmt.Errorf("Error parsing corresponding loan response")
 				}
-				if txResponse.Response != transaction.Accept {
+				if self.BestState[chainID].BestBlock.Header.Height > txResponse.ValidUntil {
+					return fmt.Errorf("Deadline exceeded, cannot withdraw loan")
+				}
+				if txResponse.Response == transaction.Accept {
 					foundResponse = true
 				}
 			}
-
 		}
 	}
 
@@ -235,50 +259,36 @@ func (self *BlockChain) ValidateTxLoanWithdraw(tx transaction.Transaction, chain
 	return nil
 }
 
-func (self *BlockChain) GetAmountPerAccount(proposal *transaction.PayoutProposal) (uint64, [][]byte, []uint64, error) {
-	// TODO(@0xbunyip): cache list so that list of receivers is fixed across blocks
-	tokenHolders, err := self.GetListTokenHolders(proposal.TokenID)
+func (self *BlockChain) GetAmountPerAccount(proposal *transaction.PayoutProposal) (uint64, []string, []uint64, error) {
+	// TODO(@0xsirrush): cache list so that list of receivers is fixed across blocks
+	tokenHolders, err := self.config.DataBase.GetCustomTokenListPaymentAddressesBalance(proposal.TokenID)
 	if err != nil {
 		return 0, nil, nil, err
 	}
 
 	// Get total token supply
 	totalTokenSupply := uint64(0)
-	for holder, _ := range tokenHolders {
-		temp, _ := hex.DecodeString(holder)
-		paymentAddress := privacy.PaymentAddress{}
-		paymentAddress.FromBytes(temp)
-		utxos := self.GetAccountUTXO(paymentAddress.Pk[:])
-		for i := 0; i < len(utxos); i += 1 {
-			// TODO(@0xbunyip): get amount from utxo hash
-			value := uint64(0)
-			totalTokenSupply += value
-		}
+	for _, value := range tokenHolders {
+		totalTokenSupply += value
 	}
 
-	// Get amount per account
-	rewardHolders := [][]byte{}
+	// Get amount per account (only count unrewarded utxo)
+	rewardHolders := []string{}
 	amounts := []uint64{}
 	for holder, _ := range tokenHolders {
 		temp, _ := hex.DecodeString(holder)
-		paymentAddress := privacy.PaymentAddress{}
-		paymentAddress.FromBytes(temp)
-		utxos := self.GetAccountUTXO(paymentAddress.Pk[:]) // Cached data
+		paymentAddress := (&privacy.PaymentAddress{}).FromBytes(temp)
+		utxos, err := self.config.DataBase.GetCustomTokenPaymentAddressUTXO(proposal.TokenID, *paymentAddress)
+		if err != nil {
+			return 0, nil, nil, err
+		}
 		amount := uint64(0)
-		for i := 0; i < len(utxos); i += 1 {
-			reward, err := self.GetUTXOReward(utxos[i]) // Data from latest block
-			if err != nil {
-				return 0, nil, nil, err
-			}
-			if reward < proposal.PayoutID {
-				// TODO(@0xbunyip): get amount from utxo hash
-				value := uint64(0)
-				amount += value
-			}
+		for _, vout := range utxos {
+			amount += vout.Value
 		}
 
 		if amount > 0 {
-			rewardHolders = append(rewardHolders, paymentAddress.Pk[:])
+			rewardHolders = append(rewardHolders, holder)
 			amounts = append(amounts, amount)
 		}
 	}
@@ -303,31 +313,34 @@ func (self *BlockChain) ValidateTxDividendPayout(tx transaction.Transaction, cha
 	for _, desc := range txPayout.Descs {
 		for _, note := range desc.Note {
 			// Check if user is not rewarded
-			utxos := self.GetAccountUTXO(note.Apk[:])
-			for _, utxo := range utxos {
-				reward, err := self.GetUTXOReward(utxo)
-				if err != nil {
-					return err
+			found := false
+			for _, holder := range tokenHolders {
+				temp, _ := hex.DecodeString(holder)
+				paymentAddress := (&privacy.PaymentAddress{}).FromBytes(temp)
+				if bytes.Equal(paymentAddress.Pk[:], note.Apk[:]) {
+					found = true
 				}
-				if reward >= proposal.PayoutID {
-					return fmt.Errorf("UTXO %s has already received dividend payment", string(utxo))
-				}
+			}
+			if !found { // All utxos of a user are rewarded at the same time
+				return fmt.Errorf("User not eligible for dividend payment")
 			}
 
 			// Check amount
-			found := 0
+			count := 0
 			for i, holder := range tokenHolders {
-				if bytes.Equal(holder, note.Apk[:]) {
-					found += 1
+				temp, _ := hex.DecodeString(holder)
+				paymentAddress := (&privacy.PaymentAddress{}).FromBytes(temp)
+				if bytes.Equal(paymentAddress.Pk[:], note.Apk[:]) {
+					count += 1
 					if amounts[i] != note.Value {
 						return fmt.Errorf("Payment amount for user %s incorrect, found %d instead of %d", holder, note.Value, amounts[i])
 					}
 				}
 			}
 
-			if found == 0 {
+			if count == 0 {
 				return fmt.Errorf("User %s isn't eligible for receiving dividend", note.Apk[:])
-			} else if found > 1 {
+			} else if count > 1 {
 				return fmt.Errorf("Multiple dividend payments found for user %s", note.Apk[:])
 			}
 		}
@@ -410,7 +423,8 @@ func (bc *BlockChain) verifyByBoard(
 		address = string(DCBAddress)
 		pubKeys = bc.BestState[0].BestBlock.Header.DCBGovernor.DCBBoardPubKeys
 	} else if boardType == common.GOV {
-		address = string(GOVAddress)
+		govAccount, _ := wallet.Base58CheckDeserialize(GOVAddress)
+		address = string(govAccount.KeySet.PaymentAddress.Pk)
 		pubKeys = bc.BestState[0].BestBlock.Header.GOVGovernor.GOVBoardPubKeys
 	} else {
 		return false
@@ -440,7 +454,67 @@ func (bc *BlockChain) VerifyCustomTokenSigns(tx transaction.Transaction) bool {
 	return bc.verifyByBoard(boardType, customToken)
 }
 
-func (self *BlockChain) ValidateTxBuyRequest(tx transaction.Transaction, chainID byte) error {
+func (self *BlockChain) ValidateTxBuySellDCBRequest(tx transaction.Transaction, chainID byte) error {
+	// Check if crowdsale existed
+	requestTx, ok := tx.(*transaction.TxBuySellRequest)
+	if !ok {
+		return fmt.Errorf("Error parsing TxBuySellDCBRequest")
+	}
+	saleData, err := self.config.DataBase.LoadCrowdsaleData(requestTx.SaleID)
+	if err != nil {
+		return fmt.Errorf("SaleID not found")
+	}
+
+	// Check if sale is still valid
+	if self.BestState[chainID].Height >= saleData.EndBlock {
+		return fmt.Errorf("Sale ended")
+	}
+
+	dbcAccount, _ := wallet.Base58CheckDeserialize(DCBAddress)
+	if bytes.Equal(saleData.BuyingAsset[:8], BondTokenID[:8]) {
+		for _, vout := range requestTx.TxTokenData.Vouts {
+			if !bytes.Equal(vout.BuySellResponse.BondID, saleData.BuyingAsset[8:]) {
+				return fmt.Errorf("Received asset id %s instead of %s", append(BondTokenID[:8], vout.BuySellResponse.BondID...), saleData.BuyingAsset)
+			}
+
+			// Check if receiving address is DCB's
+			if !bytes.Equal(vout.PaymentAddress.Pk[:], dbcAccount.KeySet.PaymentAddress.Pk) {
+				return fmt.Errorf("Sending payment to %x instead of %x", vout.PaymentAddress.Pk[:], DCBAddress)
+			}
+		}
+	} else if bytes.Equal(saleData.BuyingAsset, ConstantID[:]) {
+		for _, desc := range requestTx.Tx.Descs {
+			for _, note := range desc.Note {
+				if !bytes.Equal(note.Apk[:], dbcAccount.KeySet.PaymentAddress.Pk) {
+					return fmt.Errorf("Sending payment to %x instead of %x", note.Apk[:], DCBAddress)
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func (self *BlockChain) ValidateTxBuySellDCBResponse(tx transaction.Transaction, chainID byte) error {
+	// Check if crowdsale existed
+	responseTx, ok := tx.(*transaction.TxBuySellDCBResponse)
+	if !ok {
+		return fmt.Errorf("Error parsing TxBuySellDCBResponse")
+	}
+	saleData, err := self.config.DataBase.LoadCrowdsaleData(responseTx.SaleID)
+	if err != nil {
+		return fmt.Errorf("SaleID not found")
+	}
+
+	// Check if sale is still valid
+	if self.BestState[chainID].Height >= saleData.EndBlock {
+		return fmt.Errorf("Sale ended")
+	}
+
+	if !bytes.Equal(saleData.SellingAsset[:8], BondTokenID[:8]) {
+		return fmt.Errorf("Sending asset id %s instead of %s", BondTokenID, saleData.SellingAsset)
+	}
+
+	// TODO(@0xbunyip): validate amount of asset sent
 	return nil
 }
 
@@ -469,7 +543,7 @@ func (bc *BlockChain) ValidateTxVoteGOVProposal(tx transaction.Transaction, chai
 	return nil
 }
 
-func (self *BlockChain) ValidateDoubleSpendCustomToken(tx *transaction.TxCustomToken) (error) {
+func (self *BlockChain) ValidateDoubleSpendCustomToken(tx *transaction.TxCustomToken) error {
 	listTxs, err := self.GetCustomTokenTxs(&tx.TxTokenData.PropertyID)
 	if err != nil {
 		return err
@@ -492,7 +566,7 @@ func (self *BlockChain) ValidateDoubleSpendCustomToken(tx *transaction.TxCustomT
 	return nil
 }
 
-func (self *BlockChain) ValidateDoubleSpendCustomTokenOnTx(tx *transaction.TxCustomToken, txInBlock transaction.Transaction) (error) {
+func (self *BlockChain) ValidateDoubleSpendCustomTokenOnTx(tx *transaction.TxCustomToken, txInBlock transaction.Transaction) error {
 	temp := txInBlock.(*transaction.TxCustomToken)
 	for _, vin := range temp.TxTokenData.Vins {
 		for _, item := range tx.TxTokenData.Vins {
@@ -503,5 +577,52 @@ func (self *BlockChain) ValidateDoubleSpendCustomTokenOnTx(tx *transaction.TxCus
 			}
 		}
 	}
+	return nil
+}
+
+func (self *BlockChain) ValidateBuyFromGOVRequestTx(
+	tx transaction.Transaction,
+	chainID byte,
+) error {
+	buySellReqTx, ok := tx.(*transaction.TxBuySellRequest)
+	if !ok {
+		return fmt.Errorf("Fail parsing TxBuySellRequest transaction")
+	}
+
+	// check double spending on fee + amount tx
+	err := self.ValidateDoubleSpend(&buySellReqTx.Tx, chainID)
+	if err != nil {
+		return err
+	}
+
+	// TODO: support and validate for either bonds or govs buy requests
+
+	sellingBondsParams := self.BestState[chainID].BestBlock.Header.GOVConstitution.GOVParams.SellingBonds
+	if sellingBondsParams == nil {
+		return errors.New("SellingBonds params are not existed.")
+	}
+
+	// check if buy price againsts SellingBonds params' BondPrice is correct or not
+	if buySellReqTx.BuyPrice < sellingBondsParams.BondPrice {
+		return errors.New("Requested buy price is under SellingBonds params' buy price.")
+	}
+	return nil
+}
+
+func (self *BlockChain) ValidateBuyBackRequestTx(
+	tx transaction.Transaction,
+	chainID byte,
+) error {
+	buyBackReqTx, ok := tx.(*transaction.TxBuyBackRequest)
+	if !ok {
+		return fmt.Errorf("Fail parsing TxBuyBackRequest transaction")
+	}
+
+	// check double spending on fee + amount tx
+	err := self.ValidateDoubleSpend(buyBackReqTx.Tx, chainID)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }

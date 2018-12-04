@@ -9,18 +9,7 @@ import (
 	"github.com/ninjadotorg/constant/common"
 )
 
-// var curve *elliptic.Curve
-// var once sync.Once
-
-// func GetCurve() *elliptic.Curve {
-// 	once.Do(func() {
-// 		curve = (elliptic.Curve*)&elliptic.P256()
-// 	})
-
-// 	fmt.Printf("Pk curve: %v\n", &curve)
-// 	return &curve
-// }
-
+// const (
 // const (
 // 	P = 0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF
 // 	N = 0xFFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551
@@ -46,7 +35,7 @@ type SpendingKey []byte
 // Pk 33 bytes
 type PublicKey []byte
 
-// Rk 33 bytes
+// Rk 32 bytes
 type ReceivingKey []byte
 
 // Tk 33 bytes
@@ -87,9 +76,12 @@ func GenerateSpendingKey(seed []byte) SpendingKey {
 func GeneratePublicKey(spendingKey []byte) PublicKey {
 	var p EllipticPoint
 	p.X, p.Y = Curve.ScalarBaseMult(spendingKey)
+	fmt.Printf("Public key is not compressed\n")
+	fmt.Printf("%+v\n", p)
 	//Logger.log.Infof("p.X: %v\n", p.X)
 	//Logger.log.Infof("p.Y: %v\n", p.Y)
-	publicKey := p.CompressPoint()
+	fmt.Printf("\n%v %v \n", p.X.Bytes(), p.Y.Bytes())
+	publicKey := p.Compress()
 
 	return publicKey
 }
@@ -106,20 +98,15 @@ func GenerateReceivingKey(spendingKey []byte) ReceivingKey {
 // GenerateTransmissionKey computes a transmission key corresponding with receivingKey
 // Tk : 33 bytes
 func GenerateTransmissionKey(receivingKey []byte) TransmissionKey {
-	var p, generator EllipticPoint
-	//random := RandBytes(256)
-	random := [32]byte{2}
-	//create new generator from base generator
-	generator.X, generator.Y = Curve.ScalarBaseMult(random[:])
+	var p EllipticPoint
 
-	p.X, p.Y = Curve.ScalarMult(generator.X, generator.Y, receivingKey)
+	p.X, p.Y = Curve.ScalarBaseMult(receivingKey)
 	fmt.Printf("Transmission key point: %+v\n ", p)
-	// transmissionKey := FromPointToByteArray(p)
-	transmissionKey := p.CompressPoint()
+	transmissionKey := p.Compress()
 	return transmissionKey
 }
 
-// GenerateViewingKey generates a viewingKey corressponding with spendingKey
+// GenerateViewingKey generates a viewingKey corresponding with spendingKey
 func GenerateViewingKey(spendingKey []byte) ViewingKey {
 	var viewingKey ViewingKey
 	viewingKey.Pk = GeneratePublicKey(spendingKey)
@@ -127,7 +114,7 @@ func GenerateViewingKey(spendingKey []byte) ViewingKey {
 	return viewingKey
 }
 
-// GeneratePaymentAddress generates a payment address corressponding with spendingKey
+// GeneratePaymentAddress generates a payment address corresponding with spendingKey
 func GeneratePaymentAddress(spendingKey []byte) PaymentAddress {
 	var paymentAddress PaymentAddress
 	paymentAddress.Pk = GeneratePublicKey(spendingKey)
@@ -135,7 +122,7 @@ func GeneratePaymentAddress(spendingKey []byte) PaymentAddress {
 	return paymentAddress
 }
 
-//// FromPointToByteArray converts an elliptic point to byte arraygit
+//// FromPointToByteArray converts an elliptic point to byte array
 //func FromPointToByteArray(p EllipticPoint) []byte {
 //	var pointByte []byte
 //	x := p.X.Bytes()
@@ -153,14 +140,6 @@ func GeneratePaymentAddress(spendingKey []byte) PaymentAddress {
 //	return *point
 //}
 
-//CompressCommitment from 64 bytes to 34 bytes (include bytes index)
-func CompressCommitment(cmPoint EllipticPoint, typeCommitment byte) []byte {
-	var commitment []byte
-	commitment = append(commitment, typeCommitment)
-	commitment = append(commitment, cmPoint.CompressPoint()...)
-	return commitment
-}
-
 func isOdd(a *big.Int) bool {
 	return a.Bit(0) == 1
 }
@@ -173,7 +152,7 @@ func DecompressKey(pubKeyStr []byte) (pubkey *EllipticPoint, err error) {
 
 	pubkey = new(EllipticPoint)
 
-	err = pubkey.DecompressPoint(pubKeyStr)
+	err = pubkey.Decompress(pubKeyStr)
 	if err != nil {
 		return nil, err
 	}
@@ -188,14 +167,6 @@ func DecompressKey(pubKeyStr []byte) (pubkey *EllipticPoint, err error) {
 		return nil, fmt.Errorf("pubkey isn't on P256 curve")
 	}
 	return pubkey, nil
-}
-
-// DecompressCommitment decompress commitment byte array
-func DecompressCommitment(commitment []byte) (point *EllipticPoint, err error) {
-	//typeCommitment := commitment[0]
-	//fmt.Printf("Type Commmitment: %v\n", typeCommitment)
-	//Decompress the second component's commitment
-	return DecompressKey(commitment[34:67])
 }
 
 // PAdd1Div4 computes (p + 1) mod 4

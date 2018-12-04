@@ -1,7 +1,8 @@
 package blockchain
 
 import (
-	"encoding/base64"
+	"bytes"
+	"encoding/hex"
 	"fmt"
 	"sort"
 	"time"
@@ -9,6 +10,7 @@ import (
 	"github.com/ninjadotorg/constant/common"
 	"github.com/ninjadotorg/constant/privacy-protocol"
 	"github.com/ninjadotorg/constant/transaction"
+	"github.com/ninjadotorg/constant/wallet"
 )
 
 type BlkTmplGenerator struct {
@@ -196,6 +198,18 @@ concludeBlock:
 		txsToAdd = append(txsToAdd, tx)
 	}
 
+	// Process crowdsale for DCB
+	dcbSaleTxs, removableTxs, err := blockgen.processCrowdsale(sourceTxns, rt, chainID)
+	if err != nil {
+		return nil, err
+	}
+	for _, tx := range dcbSaleTxs {
+		txsToAdd = append(txsToAdd, tx)
+	}
+	for _, tx := range removableTxs {
+		txToRemove = append(txToRemove, tx)
+	}
+
 	// Get blocksalary fund from txs
 	salaryFundAdd := uint64(0)
 	salaryMULTP := uint64(0) //salary multiplier
@@ -380,7 +394,12 @@ func (blockgen *BlkTmplGenerator) processDividend(
 		infos := []transaction.DividendInfo{}
 		// Build tx to pay dividend to each holder
 		for i, holder := range tokenHolders {
-			holderAddress := (&privacy.PaymentAddress{}).FromBytes(holder)
+			// TODO(@0xbunyip): holder here is Pk only, change to use both Pk and Pkenc
+			holderAddr, err := hex.DecodeString(holder)
+			if err != nil {
+				return nil, 0, err
+			}
+			holderAddress := (&privacy.PaymentAddress{}).FromBytes(holderAddr)
 			info := transaction.DividendInfo{
 				TokenHolder: *holderAddress,
 				Amount:      amounts[i] / totalTokenSupply,
@@ -425,9 +444,13 @@ func buildSingleBuySellResponseTx(
 		Maturity:     sellingBondsParam.Maturity,
 		BuyBackPrice: sellingBondsParam.BuyBackPrice,
 	}
+
+	bondID := fmt.Sprintf("%s%s%s", sellingBondsParam.Maturity, sellingBondsParam.BuyBackPrice, sellingBondsParam.StartSellingAt)
+	additionalSuffix := make([]byte, 24-len(bondID))
+	bondIDBytes := append([]byte(bondID), additionalSuffix...)
 	buySellResponse := &transaction.BuySellResponse{
 		BuyBackInfo: buyBackInfo,
-		AssetID:     base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s%s%s", sellingBondsParam.Maturity, sellingBondsParam.BuyBackPrice, sellingBondsParam.StartSellingAt))),
+		BondID:      bondIDBytes,
 	}
 	return transaction.TxTokenVout{
 		Value:           buySellReqTx.Amount,
@@ -471,10 +494,13 @@ func (blockgen *BlkTmplGenerator) buildBuySellResponsesTx(
 	for _, reqTx := range buySellReqTxs {
 		tx, _ := reqTx.(*transaction.TxBuySellRequest)
 		txTokenVout := buildSingleBuySellResponseTx(tx, sellingBondsParam)
+		bondIDBytes := txTokenVout.BuySellResponse.BondID
+		var propertyID [common.HashSize]byte
+		copy(propertyID[:], append(BondTokenID[0:8], bondIDBytes...))
 		txTokenData := transaction.TxTokenData{
 			Type:       transaction.CustomTokenInit,
 			Amount:     tx.Amount,
-			PropertyID: tx.AssetType,
+			PropertyID: common.Hash(propertyID),
 			Vins:       []transaction.TxTokenVin{},
 			Vouts:      []transaction.TxTokenVout{txTokenVout},
 			// PropertyName:   "",
@@ -622,6 +648,9 @@ func (blockgen *BlkTmplGenerator) buildRefundTxs(
 		addresses = append(addresses, addr)
 		estimatedRefundAmt += refundInfo.RefundAmount
 	}
+	if len(addresses) == 0 {
+		return []*transaction.Tx{}, 0
+	}
 	refundTxs, totalRefundAmt := calculateAmountOfRefundTxs(
 		addresses,
 		estimatedRefundAmt,
@@ -630,4 +659,59 @@ func (blockgen *BlkTmplGenerator) buildRefundTxs(
 		chainID,
 	)
 	return refundTxs, totalRefundAmt
+}
+
+func (blockgen *BlkTmplGenerator) processCrowdsale(sourceTxns []*transaction.TxDesc, rt []byte, chainID byte) ([]*transaction.TxBuySellDCBResponse, []transaction.Transaction, error) {
+	txsToRemove := []transaction.Transaction{}
+	txsResponse := []*transaction.TxBuySellDCBResponse{}
+	// Get unspent bond tx to spend if needed
+	accountDCB, _ := wallet.Base58CheckDeserialize(DCBAddress)
+	keySet := accountDCB.KeySet
+
+	tokenID := &common.Hash{} // TODO(@0xbunyip): hard code bond token id here
+	unspentTxTokenOuts, err := blockgen.chain.GetUnspentTxCustomTokenVout(keySet, tokenID)
+	if err != nil {
+		unspentTxTokenOuts = []transaction.TxTokenVout{}
+	}
+	for _, txDesc := range sourceTxns {
+		if txDesc.Tx.GetType() != common.TxBuySellDCBRequest {
+			continue
+		}
+
+		tx, ok := (txDesc.Tx).(*transaction.TxBuySellRequest)
+		if !ok {
+			txsToRemove = append(txsToRemove, tx)
+		}
+
+		// Create corresponding response to send selling asset
+		// Get buying and selling asset from current sale
+		saleData, err := blockgen.chain.config.DataBase.LoadCrowdsaleData(tx.SaleID)
+		if err != nil {
+			txsToRemove = append(txsToRemove, tx)
+			continue
+		}
+
+		// Get price for asset bond
+		bondPrices := blockgen.chain.BestState[chainID].BestBlock.Header.Oracle.Bonds
+		if bytes.Equal(saleData.SellingAsset, ConstantID[:]) {
+			txResponse, err := transaction.BuildResponseForCoin(tx, saleData.SellingAsset, rt, chainID, bondPrices, tx.SaleID, DCBAddress)
+			if err != nil {
+				txsToRemove = append(txsToRemove, tx)
+			} else {
+				txsResponse = append(txsResponse, txResponse)
+			}
+		} else if bytes.Equal(saleData.SellingAsset[:8], BondTokenID[:8]) {
+			// Get unspent token UTXO to send to user
+			txResponse := &transaction.TxBuySellDCBResponse{}
+			txResponse, unspentTxTokenOuts, err = transaction.BuildResponseForBond(tx, saleData.SellingAsset, rt, chainID, bondPrices, unspentTxTokenOuts, tx.SaleID, DCBAddress)
+			if err != nil {
+				txsToRemove = append(txsToRemove, tx)
+			} else {
+				txsResponse = append(txsResponse, txResponse)
+			}
+		} else {
+			txsToRemove = append(txsToRemove, tx)
+		}
+	}
+	return txsResponse, txsToRemove, nil
 }

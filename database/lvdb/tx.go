@@ -191,14 +191,14 @@ func (db *db) CleanFeeEstimator() error {
 /*
 	StoreTransactionIndex
 	Store tx detail location
-  PubKey: prefixTx-txHash
-	VoteAmount: blockHash-blockIndex
+  Key: prefixTx-txHash
+	H: blockHash-blockIndex
 */
 func (db *db) StoreTransactionIndex(txId *common.Hash, blockHash *common.Hash, index int) error {
 	key := string(transactionKeyPrefix) + txId.String()
 	value := blockHash.String() + string(splitter) + strconv.Itoa(index)
-	fmt.Println("PubKey in StoreTransactionIndex", key)
-	fmt.Println("VoteAmount in StoreTransactionIndex", value)
+	fmt.Println("Key in StoreTransactionIndex", key)
+	fmt.Println("H in StoreTransactionIndex", value)
 	if err := db.lvdb.Put([]byte(key), []byte(value), nil); err != nil {
 		return err
 	}
@@ -323,8 +323,8 @@ func (db *db) GetTransactionLightModeByPrivateKey(privateKey *privacy.SpendingKe
 }
 
 /*
-	PubKey: transactionPrefix-txHash
-  VoteAmount: txLocation
+	Key: transactionPrefix-txHash
+  H: txLocation
   tx: tx object in byte
 */
 func (db *db) GetTransactionLightModeByHash(txId *common.Hash) ([]byte, []byte, error) {

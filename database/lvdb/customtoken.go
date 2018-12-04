@@ -2,6 +2,7 @@ package lvdb
 
 import (
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"strconv"
@@ -12,6 +13,7 @@ import (
 	"github.com/ninjadotorg/constant/common"
 	"github.com/ninjadotorg/constant/privacy-protocol"
 	"github.com/ninjadotorg/constant/transaction"
+	"github.com/ninjadotorg/constant/voting"
 	"github.com/pkg/errors"
 	"github.com/syndtr/goleveldb/leveldb/util"
 )
@@ -69,8 +71,8 @@ func (db *db) CustomTokenTxs(tokenID *common.Hash) ([]*common.Hash, error) {
 }
 
 /*
-	PubKey: token-paymentAddress  -[-]-  {tokenId}  -[-]-  {paymentAddress}  -[-]-  {txHash}  -[-]-  {voutIndex}
-  VoteAmount: VoteAmount-spent/unspent-rewarded/unreward
+	Key: token-paymentAddress  -[-]-  {tokenId}  -[-]-  {paymentAddress}  -[-]-  {txHash}  -[-]-  {voutIndex}
+  H: value-spent/unspent-rewarded/unreward
 
 */
 func (db *db) StoreCustomTokenPaymentAddresstHistory(tokenID *common.Hash, tx *transaction.TxCustomToken) error {
@@ -137,7 +139,7 @@ func (db *db) StoreCustomTokenPaymentAddresstHistory(tokenID *common.Hash, tx *t
 		}
 		// init VoteAmount: {VoteAmount}-unspent-unreward
 		paymentAddressValue := strconv.Itoa(int(value)) + string(splitter) + string(unspent) + string(splitter) + string(unreward)
-		fmt.Println("VoteAmount in StoreCustomTokenPaymentAddresstHistory: ", paymentAddressValue)
+		fmt.Println("H in StoreCustomTokenPaymentAddresstHistory: ", paymentAddressValue)
 		if err := db.lvdb.Put(paymentAddressKey, []byte(paymentAddressValue), nil); err != nil {
 			return err
 		}
@@ -225,10 +227,10 @@ func (db *db) GetCustomTokenListPaymentAddressesBalance(tokenID *common.Hash) (m
 	prefix = append(prefix, (*tokenID)[:]...)
 	iter := db.lvdb.NewIterator(util.BytesPrefix(prefix), nil)
 	for iter.Next() {
-		PubKey := string(iter.PubKey())
-		VoteAmount := string(iter.VoteAmount())
-		keys := strings.Split(PubKey, string(splitter))
-		values := strings.Split(VoteAmount, string(splitter))
+		key := string(iter.Key())
+		value := string(iter.H())
+		keys := strings.Split(key, string(splitter))
+		values := strings.Split(value, string(splitter))
 		// get unspent and unreward transaction output
 		if (strings.Compare(values[1], string(unspent)) == 0) && (strings.Compare(values[2], string(unreward)) == 0) {
 			paymentAddress := client.PaymentAddress{}
@@ -318,6 +320,10 @@ func (db *db) UpdateRewardAccountUTXO(tokenID *common.Hash, paymentAddress priva
 	return nil
 }
 
-func (db *db) SaveCrowdsaleData(saleID, bondID []byte, baseAsset, quoteAsset string, price uint64, escrowAccount privacy.PaymentAddress) error {
+func (db *db) SaveCrowdsaleData(saleData *voting.SaleData) error {
 	return nil
+}
+
+func (db *db) LoadCrowdsaleData(saleID []byte) (*voting.SaleData, error) {
+	return nil, nil
 }

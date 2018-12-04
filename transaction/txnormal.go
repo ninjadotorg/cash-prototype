@@ -2,17 +2,16 @@ package transaction
 
 import (
 	"bytes"
-	"crypto/rand"
 	"errors"
 	"fmt"
 	"math"
-	"math/big"
 	"sort"
 	"strconv" // "crypto/sha256"
 	"time"
 
 	"github.com/ninjadotorg/constant/cashec"
 	"github.com/ninjadotorg/constant/common"
+	"github.com/ninjadotorg/constant/metadata"
 	"github.com/ninjadotorg/constant/privacy-protocol"
 	"github.com/ninjadotorg/constant/privacy-protocol/client"
 	"github.com/ninjadotorg/constant/privacy-protocol/proto/zksnark"
@@ -23,7 +22,7 @@ type Tx struct {
 	Version  int8   `json:"Version"`
 	Type     string `json:"Type"` // Transaction type
 	LockTime int64  `json:"LockTime"`
-	Fee      uint64 `json:"Fee"` // Fee applies: always consant
+	Fee      uint64 `json:"Fee"` // Fee applies: always constant
 
 	Descs    []*JoinSplitDesc `json:"Descs"`
 	JSPubKey []byte           `json:"JSPubKey,omitempty"` // 64 bytes
@@ -31,14 +30,18 @@ type Tx struct {
 
 	AddressLastByte byte `json:"AddressLastByte"`
 
-	txId       *common.Hash
-	sigPrivKey *client.PrivateKey
+	// temp variable to view id of itself
+	txId *common.Hash // is always private property of struct
+	// temp variable to view sign priv key which use in tx
+	sigPrivKey *privacy.SpendingKey // is always private property of struct
 
 	// this one is a hash id of requested tx
 	// and is used inside response txs
 	// so that we can determine pair of req/res txs
 	// for example, BuySellRequestTx/BuySellResponseTx
 	RequestedTxID *common.Hash
+
+	Metadata metadata.Metadata
 }
 
 func (tx *Tx) SetTxID(txId *common.Hash) {
@@ -47,6 +50,62 @@ func (tx *Tx) SetTxID(txId *common.Hash) {
 
 func (tx *Tx) GetTxID() *common.Hash {
 	return tx.txId
+}
+
+func (tx *Tx) CheckTxVersion(maxTxVersion int8) bool {
+	if tx.Version > maxTxVersion {
+		return false
+	}
+	return true
+}
+
+func (tx *Tx) CheckTransactionFee(minFee uint64) bool {
+	if tx.IsSalaryTx() {
+		return true
+	}
+	if tx.Metadata != nil {
+		return tx.Metadata.CheckTransactionFee(tx, minFee)
+	}
+	if tx.Fee < minFee {
+		return false
+	}
+	return true
+}
+
+func (tx *Tx) IsSalaryTx() bool {
+	if tx.Type != common.TxSalaryType {
+		return false
+	}
+	// Check nullifiers in every Descs
+	descs := tx.Descs
+	if len(descs) != 1 {
+		return false
+	}
+	if descs[0].Reward <= 0 {
+		return false
+	}
+	return true
+}
+
+func (tx *Tx) validateDoubleSpendTxWithCurrentMempool(poolNullifiers map[common.Hash][][]byte) error {
+	for _, temp1 := range poolNullifiers {
+		for _, desc := range tx.Descs {
+			for _, nullifier := range desc.Nullifiers {
+				if ok, err := common.SliceBytesExists(temp1, nullifier); !ok || err != nil {
+					return errors.New("Double spend")
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func (tx *Tx) ValidateTxWithCurrentMempool(mr MempoolRetriever) error {
+	if tx.Type == common.TxSalaryType {
+		return errors.New("Can not receive a salary tx from other node, this is a violation")
+	}
+	poolNullifiers := mr.GetPoolNullifiers()
+	return tx.validateDoubleSpendTxWithCurrentMempool(poolNullifiers)
 }
 
 // Hash returns the hash of all fields of the transaction
@@ -176,7 +235,7 @@ func CreateTx(
 	var value uint64
 	for _, p := range paymentInfo {
 		value += p.Amount
-		fmt.Printf("[CreateTx] paymentInfo.VoteAmount: %+v, paymentInfo.PaymentAddress: %x\n", p.Amount, p.PaymentAddress.Pk)
+		fmt.Printf("[CreateTx] paymentInfo.H: %+v, paymentInfo.PaymentAddress: %x\n", p.Amount, p.PaymentAddress.Pk)
 	}
 
 	type ChainNote struct {
@@ -192,7 +251,7 @@ func CreateTx(
 				for _, note := range desc.Note {
 					chainNote := &ChainNote{note: note, chainID: chainID}
 					inputNotes = append(inputNotes, chainNote)
-					fmt.Printf("[CreateTx] inputNote.VoteAmount: %+v\n", note.Value)
+					fmt.Printf("[CreateTx] inputNote.H: %+v\n", note.Value)
 				}
 			}
 		}
@@ -211,7 +270,11 @@ func CreateTx(
 	senderFullKey.ImportFromPrivateKeyByte((*senderKey)[:])
 
 	// Create tx before adding js descs
-	tx, err := CreateEmptyTx(common.TxNormalType)
+	randomSignKey := true
+	if noPrivacy {
+		randomSignKey = false
+	}
+	tx, err := CreateEmptyTx(common.TxNormalType, senderKey, randomSignKey)
 	if err != nil {
 		return nil, err
 	}
@@ -287,7 +350,7 @@ func CreateTx(
 					}
 				}
 				if found == false {
-					return nil, fmt.Errorf("Commitment %x of input note isn't in commitments list of chain %d", input.InputNote.Cm, chainID)
+					return nil, fmt.Errorf("PedersenCommitment %x of input note isn't in commitments list of chain %d", input.InputNote.Cm, chainID)
 				}
 			}
 		}
@@ -359,7 +422,7 @@ func CreateTx(
 
 				// Use the change note to continually send to receivers if needed
 				if len(paymentInfo) > 0 {
-					// outNote data (R and Rho) will be updated when building zk-proof
+					// outNote data (Randomness and Rho) will be updated when building zk-proof
 					chainNote := &ChainNote{note: outNote, chainID: senderChainID}
 					inputNotes = append(inputNotes, chainNote)
 					fmt.Printf("Reuse change note later\n")
@@ -473,13 +536,13 @@ func (tx *Tx) buildJSDescAndEncrypt(
 	fmt.Printf("ephemeralPubKey: %x\n", *ephemeralPubKey)
 	fmt.Printf("tranmissionKey[0]: %x\n", keys[0])
 	fmt.Printf("tranmissionKey[1]: %x\n", keys[1])
-	fmt.Printf("notes[0].VoteAmount: %+v\n", notes[0].Value)
+	fmt.Printf("notes[0].H: %+v\n", notes[0].Value)
 	fmt.Printf("notes[0].Rho: %x\n", notes[0].Rho)
-	fmt.Printf("notes[0].R: %x\n", notes[0].R)
+	fmt.Printf("notes[0].Randomness: %x\n", notes[0].R)
 	fmt.Printf("notes[0].Memo: %+v\n", notes[0].Memo)
-	fmt.Printf("notes[1].VoteAmount: %+v\n", notes[1].Value)
+	fmt.Printf("notes[1].H: %+v\n", notes[1].Value)
 	fmt.Printf("notes[1].Rho: %x\n", notes[1].Rho)
-	fmt.Printf("notes[1].R: %x\n", notes[1].R)
+	fmt.Printf("notes[1].Randomness: %x\n", notes[1].R)
 	fmt.Printf("notes[1].Memo: %+v\n", notes[1].Memo)
 	var noteciphers [][]byte
 	if proof != nil {
@@ -576,15 +639,22 @@ func (tx *Tx) SignTx() error {
 	copy(data, hash[:])
 
 	// Sign
-	ecdsaSignature := new(client.EcdsaSignature)
+	/*ecdsaSignature := new(client.EcdsaSignature)
 	var err error
 	ecdsaSignature.R, ecdsaSignature.S, err = client.Sign(rand.Reader, tx.sigPrivKey, data[:])
+	if err != nil {
+		return err
+	}*/
+	keyset := cashec.KeySet{}
+	keyset.ImportFromPrivateKey(tx.sigPrivKey)
+	sign, err := keyset.Sign(data)
 	if err != nil {
 		return err
 	}
 
 	//Signature 64 bytes
-	tx.JSSig = JSSigToByteArray(ecdsaSignature)
+	//tx.JSSig = JSSigToByteArray(ecdsaSignature)
+	tx.JSSig = sign
 
 	return nil
 }
@@ -596,21 +666,27 @@ func (tx *Tx) VerifySign() (bool, error) {
 	}
 
 	// UnParse Public key
-	pubKey := new(client.PublicKey)
+	/*pubKey := new(client.PublicKey)
 	pubKey.X = new(big.Int).SetBytes(tx.JSPubKey[0:32])
-	pubKey.Y = new(big.Int).SetBytes(tx.JSPubKey[32:64])
+	pubKey.Y = new(big.Int).SetBytes(tx.JSPubKey[32:64])*/
 
 	// UnParse ECDSA signature
-	ecdsaSignature := new(client.EcdsaSignature)
+	/*ecdsaSignature := new(client.EcdsaSignature)
 	ecdsaSignature.R = new(big.Int).SetBytes(tx.JSSig[0:32])
-	ecdsaSignature.S = new(big.Int).SetBytes(tx.JSSig[32:64])
+	ecdsaSignature.S = new(big.Int).SetBytes(tx.JSSig[32:64])*/
 
 	// Hash origin transaction
 	hash := tx.GetTxID()
 	data := make([]byte, common.HashSize)
 	copy(data, hash[:])
 
-	valid := client.VerifySign(pubKey, data[:], ecdsaSignature.R, ecdsaSignature.S)
+	//valid := client.VerifySign(pubKey, data[:], ecdsaSignature.R, ecdsaSignature.S)
+	keyset := cashec.KeySet{}
+	keyset.PaymentAddress.Pk = tx.JSPubKey
+	valid, err := keyset.Verify(data[:], tx.JSSig)
+	if err != nil {
+		return false, err
+	}
 	return valid, nil
 }
 
@@ -636,7 +712,7 @@ func GenerateProofForGenesisTx(
 	tempKeySet.ImportFromPrivateKey(inputs[0].Key)
 	addressLastByte := tempKeySet.PaymentAddress.Pk[len(tempKeySet.PaymentAddress.Pk)-1]
 
-	tx, err := CreateEmptyTx(common.TxNormalType)
+	tx, err := CreateEmptyTx(common.TxNormalType, nil, true)
 	if err != nil {
 		return nil, err
 	}
@@ -743,15 +819,23 @@ func EstimateTxSize(usableTx []*Tx, payments []*privacy.PaymentInfo) uint64 {
 }
 
 // CreateEmptyTx returns a new Tx initialized with default data
-func CreateEmptyTx(txType string) (*Tx, error) {
+func CreateEmptyTx(txType string, privKey *privacy.SpendingKey, randomSignKey bool) (*Tx, error) {
 	//Generate signing key 96 bytes
-	sigPrivKey, err := client.GenerateKey(rand.Reader)
+	var sigPrivKey *privacy.SpendingKey
+	var err error
+	if !randomSignKey {
+		sigPrivKey = privKey
+	} else {
+		temp := privacy.GenerateSpendingKey(privacy.RandBytes(32))
+		sigPrivKey = &temp
+	}
+
 	if err != nil {
 		return nil, err
 	}
 
 	// Verification key 64 bytes
-	sigPubKey := PubKeyToByteArray(&sigPrivKey.PublicKey)
+	sigPubKey := privacy.GeneratePublicKey((*sigPrivKey)[:])
 
 	tx := &Tx{
 		Version:         TxVersion,

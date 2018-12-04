@@ -5,10 +5,8 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"errors"
-	"sort"    //"strconv"
-	"strings" //"fmt"
-
-	//"time"
+	"sort"
+	"strings"
 	"sync"
 
 	"github.com/davecgh/go-spew/spew"
@@ -505,11 +503,21 @@ func (self *BlockChain) UpdateDividendPayout(block *Block) error {
 		case common.TxDividendPayout:
 			{
 				tx := tx.(*transaction.TxDividendPayout)
+				tokenID := tx.TokenID
 				for _, desc := range tx.Descs {
 					for _, note := range desc.Note {
-						utxos := self.GetAccountUTXO(note.Apk[:])
+						// TODO(@0xbunyip): replace note.Apk with bytes of PaymentAddress, not just Pk
+						paymentAddress := (&privacy.PaymentAddress{}).FromBytes(note.Apk[:])
+						utxos, err := self.config.DataBase.GetCustomTokenPaymentAddressUTXO(tokenID, *paymentAddress)
+						if err != nil {
+							return err
+						}
 						for _, utxo := range utxos {
-							self.UpdateUTXOReward(utxo, tx.PayoutID)
+							txHash := utxo.GetTxCustomTokenID()
+							err := self.config.DataBase.UpdateRewardAccountUTXO(tokenID, *paymentAddress, &txHash, utxo.GetIndex())
+							if err != nil {
+								return err
+							}
 						}
 					}
 				}
@@ -548,13 +556,21 @@ func (self *BlockChain) UpdateVoteCountBoard(block *Block) error {
 func (self *BlockChain) ProcessCrowdsaleTxs(block *Block) error {
 	for _, tx := range block.Transactions {
 		switch tx.GetType() {
-		case common.TxCrowdsale:
+		case common.TxAcceptDCBProposal:
 			{
-				// Store saledata in db
-				tx := tx.(*transaction.TxCrowdsale)
-				err := self.config.DataBase.SaveCrowdsaleData(tx.SaleID, tx.BondID, tx.BaseAsset, tx.QuoteAsset, tx.Price, tx.EscrowAccount)
+				txAccepted := tx.(*transaction.TxAcceptDCBProposal)
+				_, _, _, getTx, err := self.GetTransactionByHash(txAccepted.DCBProposalTXID)
+				proposal := getTx.(*transaction.TxSubmitDCBProposal)
 				if err != nil {
 					return err
+				}
+
+				// Store saledata in db if needed
+				if proposal.DCBProposalData.DCBParams.SaleData != nil {
+					err := self.config.DataBase.SaveCrowdsaleData(proposal.DCBProposalData.DCBParams.SaleData)
+					if err != nil {
+						return err
+					}
 				}
 			}
 		}
@@ -770,6 +786,9 @@ func (self *BlockChain) DecryptTxByKey(txInBlock transaction.Transaction, nullif
 			EncryptedData: make([][]byte, 0),
 		}
 		if desc.Proof != nil && len(desc.EncryptedData) > 0 {
+			if len(keys.PrivateKey) == 0 || len(keys.ReadonlyKey.Rk) == 0 {
+				continue
+			}
 			// have privacy-protocol
 			for i, encData := range desc.EncryptedData {
 				var epk client.EphemeralPubKey
@@ -808,13 +827,16 @@ func (self *BlockChain) DecryptTxByKey(txInBlock transaction.Transaction, nullif
 				if bytes.Equal(note.Apk[:], keys.PaymentAddress.Pk[:]) && note.Value > 0 {
 					// no privacy-protocol
 					candidateCommitment := desc.Commitments[i]
+					candidateNullifier := desc.Nullifiers[i]
 					if len(nullifiersInDb) > 0 {
 						// -> check commitment with db nullifiers
-						var rho [32]byte
-						copy(rho[:], note.Rho)
-						candidateNullifier := client.GetNullifier(keys.PrivateKey, rho)
-						if len(candidateNullifier) == 0 {
-							continue
+						if len(keys.PrivateKey) > 0 {
+							var rho [32]byte
+							copy(rho[:], note.Rho)
+							candidateNullifier = client.GetNullifier(keys.PrivateKey, rho)
+							if len(candidateNullifier) == 0 {
+								continue
+							}
 						}
 						checkCandiateNullifier, err := common.SliceBytesExists(nullifiersInDb, candidateNullifier)
 						if err != nil || checkCandiateNullifier == true {
@@ -841,14 +863,10 @@ func (self *BlockChain) DecryptTxByKey(txInBlock transaction.Transaction, nullif
 	return copyTx
 }
 
-// GetListUnspentTxByPrivateKeyInBlock - fetch block to get unspent tx commitment which privatekey can use it
+// GetListUnspentTxByKeysetInBlock - fetch block to get unspent tx commitment which privatekey can use it
 // return a list tx which contain commitment which can be used
-func (self *BlockChain) GetListUnspentTxByPrivateKeyInBlock(privateKey *privacy.SpendingKey, block *Block, nullifiersInDb [][]byte, returnFullTx bool) (map[byte][]transaction.Tx, error) {
+func (self *BlockChain) GetListUnspentTxByKeysetInBlock(keys *cashec.KeySet, block *Block, nullifiersInDb [][]byte, returnFullTx bool) (map[byte][]transaction.Tx, error) {
 	results := make(map[byte][]transaction.Tx)
-
-	// Get set of keys from private keybyte
-	keys := cashec.KeySet{}
-	keys.ImportFromPrivateKey(privateKey)
 
 	chainId := block.Header.ChainID
 	results[chainId] = make([]transaction.Tx, 0)
@@ -858,7 +876,7 @@ func (self *BlockChain) GetListUnspentTxByPrivateKeyInBlock(privateKey *privacy.
 	for _, txInBlock := range txsInBlock {
 		if txInBlock.GetType() == common.TxNormalType || txInBlock.GetType() == common.TxSalaryType {
 			// copyTx ONLY contains commitment which relate to keys
-			copyTx := self.DecryptTxByKey(txInBlock, nullifiersInDb, &keys)
+			copyTx := self.DecryptTxByKey(txInBlock, nullifiersInDb, keys)
 			if len(copyTx.Descs) > 0 {
 				if !returnFullTx {
 					// only return copy tx which contain unspent commitment which relate with private key
@@ -884,7 +902,7 @@ With private-key, we can check unspent tx by check nullifiers from database
 - Param #1: privateKey - byte[] of privatekey
 - Param #2: coinType - which type of joinsplitdesc(COIN or BOND)
 */
-func (self *BlockChain) GetListUnspentTxByPrivateKey(privateKey *privacy.SpendingKey, sortType int, sortAsc bool) (map[byte][]transaction.Tx, error) {
+func (self *BlockChain) GetListUnspentTxByKeyset(keyset *cashec.KeySet, sortType int, sortAsc bool) (map[byte][]transaction.Tx, error) {
 	results := make(map[byte][]transaction.Tx)
 
 	// lock chain
@@ -904,7 +922,7 @@ func (self *BlockChain) GetListUnspentTxByPrivateKey(privateKey *privacy.Spendin
 	}
 	if self.config.Light {
 		// Get unspent tx with light mode
-		fullTxs, err := self.config.DataBase.GetTransactionLightModeByPrivateKey(privateKey)
+		fullTxs, err := self.config.DataBase.GetTransactionLightModeByPrivateKey(&keyset.PrivateKey)
 		Logger.log.Infof("UTXO lightmode %+v", fullTxs)
 		if err != nil {
 			return nil, err
@@ -913,7 +931,7 @@ func (self *BlockChain) GetListUnspentTxByPrivateKey(privateKey *privacy.Spendin
 		for chainID, txArrays := range fullTxs {
 			for _, tx := range txArrays {
 				keys := cashec.KeySet{}
-				keys.ImportFromPrivateKey(privateKey)
+				keys.ImportFromPrivateKey(&keyset.PrivateKey)
 				copyTx := self.DecryptTxByKey(&tx, nullifiersInDb, &keys)
 				results[chainID] = append(results[chainID], copyTx)
 			}
@@ -932,7 +950,7 @@ func (self *BlockChain) GetListUnspentTxByPrivateKey(privateKey *privacy.Spendin
 		for blockHeight > 0 {
 			var err1 error
 			// fetch block to get tx
-			resultsInChain, err1 := self.GetListUnspentTxByPrivateKeyInBlock(privateKey, block, nullifiersInDb, false)
+			resultsInChain, err1 := self.GetListUnspentTxByKeysetInBlock(keyset, block, nullifiersInDb, false)
 			if err1 != nil {
 				// unlock chain
 				//self.chainLock.Unlock()
@@ -1104,10 +1122,10 @@ func (self *BlockChain) GetTransactionByHash(txHash *common.Hash) (byte, *common
 	}
 	block, err := self.GetBlockByBlockHash(blockHash)
 	if err != nil {
-		Logger.log.Errorf("ERROR", err, "NO Transaction in block with hash &+v", blockHash, "and Index", index, "contains", block.Transactions[index])
+		Logger.log.Errorf("ERROR", err, "NO Transaction in block with hash &+v", blockHash, "and index", index, "contains", block.Transactions[index])
 		return byte(255), nil, -1, nil, err
 	}
-	Logger.log.Infof("Transaction in block with hash &+v", blockHash, "and Index", index, "contains", block.Transactions[index])
+	Logger.log.Infof("Transaction in block with hash &+v", blockHash, "and index", index, "contains", block.Transactions[index])
 	return block.Header.ChainID, blockHash, index, block.Transactions[index], nil
 }
 
@@ -1170,21 +1188,6 @@ func (self *BlockChain) GetListTokenHolders(tokenID *common.Hash) (map[string]ui
 		return nil, err
 	}
 	return result, nil
-}
-
-// Cached data, not from newest block
-func (self *BlockChain) GetAccountUTXO(account []byte) [][]byte {
-	return nil
-}
-
-// New data from latest block
-func (self *BlockChain) GetUTXOReward(utxo []byte) (uint64, error) {
-	return 0, nil
-}
-
-// Update to data of latest block
-func (self *BlockChain) UpdateUTXOReward(utxo []byte, reward uint64) error {
-	return nil
 }
 
 func (self *BlockChain) GetCustomTokenRewardSnapshot() map[string]uint64 {

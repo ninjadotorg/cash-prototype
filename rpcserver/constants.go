@@ -40,29 +40,34 @@ const (
 	CustomToken                         = "customtoken"
 	CheckHashValue                      = "checkhashvalue"
 	GetListCustomTokenBalance           = "getlistcustomtokenbalance"
-
-	GetHeader = "getheader"
+	GetLoanParams                       = "loanparams"
+	GetBlockHeader                      = "getheader"
 
 	// Wallet rpc cmd
-	ListAccounts           = "listaccounts"
-	GetAccount             = "getaccount"
-	GetAddressesByAccount  = "getaddressesbyaccount"
-	GetAccountAddress      = "getaccountaddress"
-	DumpPrivkey            = "dumpprivkey"
-	ImportAccount          = "importaccount"
-	RemoveAccount          = "removeaccount"
-	ListUnspent            = "listunspent"
-	GetBalance             = "getbalance"
-	GetBalanceByPrivatekey = "getbalancebyprivatekey"
-	GetReceivedByAccount   = "getreceivedbyaccount"
-	SetTxFee               = "settxfee"
-	EncryptData            = "encryptdata"
+	ListAccounts               = "listaccounts"
+	GetAccount                 = "getaccount"
+	GetAddressesByAccount      = "getaddressesbyaccount"
+	GetAccountAddress          = "getaccountaddress"
+	DumpPrivkey                = "dumpprivkey"
+	ImportAccount              = "importaccount"
+	RemoveAccount              = "removeaccount"
+	ListUnspent                = "listunspent"
+	GetBalance                 = "getbalance"
+	GetBalanceByPrivatekey     = "getbalancebyprivatekey"
+	GetBalanceByPaymentAddress = "getbalancebypaymentaddress"
+	GetReceivedByAccount       = "getreceivedbyaccount"
+	SetTxFee                   = "settxfee"
+	EncryptData                = "encryptdata"
 
 	// multisig for board spending
 	CreateSignatureOnCustomTokenTx = "createsignatureoncustomtokentx"
 	GetListDCBBoard                = "getlistdcbboard"
 	GetListCBBoard                 = "getlistcbboard"
 	GetListGOVBoard                = "getlistgovboard"
+	GetGOVParams                   = "getgovparams"
+	GetDCBParams                   = "getdcbparams"
+	GetGOVConstitution             = "getgovconstitution"
+	GetDCBConstitution             = "getdcbconstitution"
 
 	// vote
 	SendRawVoteBoardDCBTx                = "sendrawvoteboarddcbtx"
@@ -71,4 +76,7 @@ const (
 	SendRawVoteBoardGOVTx                = "sendrawvoteboardgovtx"
 	CreateRawVoteGOVBoardTx              = "createrawvotegovboardtx"
 	CreateAndSendVoteGOVBoardTransaction = "createandsendvotegovboardtransaction"
+
+	// gov
+	GetBondTypes = "getbondtypes"
 )

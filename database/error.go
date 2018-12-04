@@ -31,7 +31,7 @@ var ErrCodeMessage = map[int]struct {
 
 	// -2xxx levelDb
 	OpenDbErr:     {-2000, "Open database error"},
-	NotExistValue: {-2001, "VoteAmount is not existed"},
+	NotExistValue: {-2001, "H is not existed"},
 
 	// -3xxx blockchain
 	NotImplHashMethod: {-3000, "Data does not implement Hash() method"},

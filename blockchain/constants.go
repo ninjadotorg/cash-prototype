@@ -21,33 +21,34 @@ const (
 	MainnetGenesisblockPaymentAddress = "1UuyYcHgVFLMd8Qy7T1ZWRmfFvaEgogF7cEsqY98ubQjoQUy4VozTqyfSNjkjhjR85C6GKBmw1JKekgMwCeHtHex25XSKwzb9QPQ2g6a3"
 
 	// Testnet
-	Testnet                           = 0x02
-	TestnetName                       = "testnet"
-	TestnetDefaultPort                = "9444"
-	TestnetInitFundSalary             = 1000000000000000
-	TestnetInitDCBToken               = 10000
-	TestnetInitGovToken               = 10000
-	TestnetInitCmBToken               = 0
-	TestnetInitBondToken              = 0
-	TestnetGenesisBlockPaymentAddress = "1Uv12YEcd5w5Qm79sTGHSHYnCfVKM2ui8mbapD1dgziUf9211b5cnCSdxVb1DoXyDD19V1THMSnaAWZ18sJtmaVnh56wVhwb1HuYpkTa4"
+	Testnet               = 0x02
+	TestnetName           = "testnet"
+	TestnetDefaultPort    = "9444"
+	TestnetInitFundSalary = 1000000000000000
+	TestnetInitDCBToken   = 10000
+	TestnetInitGovToken   = 10000
 
 	//board and proposal parameters
-	NumberOfDCBGovernors = 50
-	NumberOfGOVGovernors = 50
+	NumberOfDCBGovernors              = 50
+	NumberOfGOVGovernors              = 50
+	TestnetInitCmBToken               = 10000
+	TestnetInitBondToken              = 10000
+	TestnetGenesisBlockPaymentAddress = "1Uv3jP4ixNx3BkEtmUUxKXA1TXUduix3KMCWXHvLqVyA9CFfoLRZ949zTBNqDUPSzaPCZPrQKSfiEHguFazK6VeDmEk1RMLfX1kQiSqJ6"
 )
 
 // board addresses
 var (
-	DCBAddress = []byte{}
-	GOVAddress = []byte{}
+	DCBAddress = "1Uv3jP4ixNx3BkEtmUUxKXA1TXUduix3KMCWXHvLqVyA9CFfoLRZ949zTBNqDUPSzaPCZPrQKSfiEHguFazK6VeDmEk1RMLfX1kQiSqJ6"
+	GOVAddress = "1Uv3jP4ixNx3BkEtmUUxKXA1TXUduix3KMCWXHvLqVyA9CFfoLRZ949zTBNqDUPSzaPCZPrQKSfiEHguFazK6VeDmEk1RMLfX1kQiSqJ6"
 )
 
 // special token ids (aka. PropertyID in custom token)
 var (
+	BondTokenID    = [common.HashSize]byte{0, 0, 0, 0, 0, 0, 0, 0}
 	DCBTokenID     = [common.HashSize]byte{1}
 	GOVTokenID     = [common.HashSize]byte{2}
 	CMBTokenID     = [common.HashSize]byte{3}
-	BondTokenID    = [common.HashSize]byte{4}
+	ConstantID     = [common.HashSize]byte{4} // To send Constant in custom token
 	VoteDCBTokenID = [common.HashSize]byte{5}
 	VoteGOVTokenID = [common.HashSize]byte{6}
 )

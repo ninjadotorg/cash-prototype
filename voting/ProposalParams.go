@@ -1,10 +1,13 @@
 package voting
 
-import "github.com/ninjadotorg/constant/common"
+import (
+	"github.com/ninjadotorg/constant/common"
+)
 
 type GOVVotingParams struct {
 	SalaryPerTx  uint64 // salary for each tx in block(mili constant)
 	BasicSalary  uint64 // basic salary per block(mili constant)
+	TxFee        uint64
 	SellingBonds *SellingBonds
 	RefundInfo   *RefundInfo
 }
@@ -18,12 +21,22 @@ type SellingBonds struct {
 	SellingWithin  uint32 // selling bonds within n blocks
 }
 
+type SaleData struct {
+	SaleID []byte // Unique id of the crowdsale to store in db
+
+	BuyingAsset  []byte
+	SellingAsset []byte
+	Price        uint64
+	EndBlock     int32
+}
+
 type RefundInfo struct {
 	ThresholdToLargeTx uint64
 	RefundAmount       uint64
 }
 
 type DCBVotingParams struct {
+	*SaleData
 }
 
 //xxx

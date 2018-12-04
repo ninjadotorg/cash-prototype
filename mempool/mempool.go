@@ -1,6 +1,7 @@
 package mempool
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"log"
@@ -13,6 +14,7 @@ import (
 	"github.com/ninjadotorg/constant/database"
 	"github.com/ninjadotorg/constant/privacy-protocol/client"
 	"github.com/ninjadotorg/constant/transaction"
+	"github.com/ninjadotorg/constant/wallet"
 )
 
 // config is a descriptor containing the memory pool configuration.
@@ -60,6 +62,21 @@ func (tp *TxPool) Init(cfg *Config) {
 	tp.pool = make(map[common.Hash]*TxDesc)
 	tp.poolNullifiers = make(map[common.Hash][][]byte)
 }
+
+// ----------- transaction.MempoolRetriever's implementation -----------------
+func (tp *TxPool) GetPoolNullifiers() map[common.Hash][][]byte {
+	return tp.poolNullifiers
+}
+
+func (tp *TxPool) GetTxsInMem() map[common.Hash]transaction.TxDesc {
+	txsInMem := make(map[common.Hash]transaction.TxDesc)
+	for hash, txDesc := range tp.pool {
+		txsInMem[hash] = txDesc.Desc
+	}
+	return txsInMem
+}
+
+// ----------- end of transaction.MempoolRetriever's implementation -----------------
 
 // check transaction in pool
 func (tp *TxPool) isTxInPool(hash *common.Hash) bool {
@@ -126,7 +143,7 @@ func (tp *TxPool) maybeAcceptTransaction(tx transaction.Transaction) (*common.Ha
 	// nextBlockHeight := bestHeight + 1
 	// Check tx with policy
 	// check version
-	ok := tp.config.Policy.CheckTxVersion(&tx)
+	ok := tx.CheckTxVersion(tp.config.Policy.MaxTxVersion)
 	if !ok {
 		err := MempoolTxError{}
 		err.Init(RejectVersion, errors.New(fmt.Sprintf("%+v's version is invalid", txHash.String())))
@@ -134,14 +151,18 @@ func (tp *TxPool) maybeAcceptTransaction(tx transaction.Transaction) (*common.Ha
 	}
 
 	// check fee of tx
-	txFee, err := tp.CheckTransactionFee(tx)
-	if err != nil {
+	minFee := tp.config.Policy.BlockChain.BestState[0].BestBlock.Header.GOVConstitution.GOVParams.TxFee
+	txFee := tx.GetTxFee()
+	ok = tx.CheckTransactionFee(minFee)
+	if !ok {
+		err := MempoolTxError{}
+		err.Init(RejectVersion, errors.New(fmt.Sprintf("transaction %+v has %d fees which is under the required amount of %d", tx.Hash().String(), txFee, minFee)))
 		return nil, nil, err
 	}
 	// end check with policy
 
 	// check tx with all txs in current mempool
-	err = tp.ValidateTxWithCurrentMempool(tx)
+	err = tx.ValidateTxWithCurrentMempool(tp)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -200,7 +221,7 @@ func (tp *TxPool) removeTx(tx *transaction.Transaction) error {
 }
 
 // ValidateTransaction sanity for normal tx data
-func (tp *TxPool) validateSanityNormalTxData(tx *transaction.Tx) (bool, error) {
+func (tp *TxPool) validateSanityNormalTxData(tx *transaction.Tx, allowReward bool) (bool, error) {
 	txN := tx
 	//check version
 	if txN.Version > transaction.TxVersion {
@@ -289,26 +310,31 @@ func (tp *TxPool) validateSanityNormalTxData(tx *transaction.Tx) (bool, error) {
 			}
 		}
 		// check nulltifier is existed in DB
-		if desc.Reward != 0 {
+		if desc.Reward != 0 && !allowReward {
 			return false, errors.New("Wrong tx desc's reward")
 		}
 	}
 	return true, nil
 }
 
-func (tp *TxPool) validateSanityCustomTokenTxData(txCustomToken *transaction.TxCustomToken) (bool, error) {
-	ok, err := tp.validateSanityNormalTxData(&txCustomToken.Tx)
+func (tp *TxPool) validateSanityCustomTokenTxData(txCustomToken *transaction.TxCustomToken, allowToUseDCBFund bool) (bool, error) {
+	ok, err := tp.validateSanityNormalTxData(&txCustomToken.Tx, allowToUseDCBFund)
 	if err != nil || !ok {
 		return ok, err
 	}
 	vins := txCustomToken.TxTokenData.Vins
 	zeroHash := common.Hash{}
 	for _, vin := range vins {
-		if vin.Signature == "" {
-			return false, errors.New("Wrong signature")
-		}
 		if len(vin.PaymentAddress.Pk) == 0 {
 			return false, errors.New("Wrong input transaction")
+		}
+		dbcAccount, _ := wallet.Base58CheckDeserialize(blockchain.DCBAddress)
+		if bytes.Equal(vin.PaymentAddress.Pk, dbcAccount.KeySet.PaymentAddress.Pk) {
+			if !allowToUseDCBFund {
+				return false, errors.New("Cannot use DCB's fund here")
+			}
+		} else if vin.Signature == "" {
+			return false, errors.New("Wrong signature")
 		}
 		if vin.TxCustomTokenID.String() == zeroHash.String() {
 			return false, errors.New("Wrong input transaction")
@@ -326,8 +352,42 @@ func (tp *TxPool) validateSanityCustomTokenTxData(txCustomToken *transaction.TxC
 	return true, nil
 }
 
+func (tp *TxPool) validateBuySellReqTxSanity(buySellReqTx *transaction.TxBuySellRequest, allowToUseDCBFund bool) (bool, error) {
+	ok, err := tp.validateSanityNormalTxData(&buySellReqTx.Tx, allowToUseDCBFund)
+	if err != nil || !ok {
+		return ok, err
+	}
+	if len(buySellReqTx.PaymentAddress.Pk) == 0 {
+		return false, errors.New("Wrong request info's payment address")
+	}
+	if buySellReqTx.BuyPrice == 0 {
+		return false, errors.New("Wrong request info's buy price")
+	}
+	if buySellReqTx.Amount == 0 {
+		return false, errors.New("Wrong request info's amount")
+	}
+	if len(buySellReqTx.AssetType) != common.HashSize {
+		return false, errors.New("Wrong request info's asset type")
+	}
+	return true, nil
+}
+
+func (tp *TxPool) validateBuyBackReqTxSanity(buyBackRequestTx *transaction.TxBuyBackRequest, allowToUseDCBFund bool) (bool, error) {
+	ok, err := tp.validateSanityNormalTxData(buyBackRequestTx.Tx, allowToUseDCBFund)
+	if err != nil || !ok {
+		return ok, err
+	}
+	if buyBackRequestTx.VoutIndex < 0 {
+		return false, errors.New("Wrong request info's vout index")
+	}
+	if len(buyBackRequestTx.BuyBackFromTxID) == 0 {
+		return false, errors.New("Wrong request info's BuyBackFromTxID")
+	}
+	return true, nil
+}
+
 func (tp *TxPool) validateSanityVoteDCBBoardTx(voteDCBBoard *transaction.TxVoteDCBBoard) (bool, error) {
-	ok, err := tp.validateSanityCustomTokenTxData(&voteDCBBoard.TxCustomToken)
+	ok, err := tp.validateSanityCustomTokenTxData(&voteDCBBoard.TxCustomToken, false)
 	if err != nil || !ok {
 		return ok, err
 	}
@@ -338,7 +398,7 @@ func (tp *TxPool) validateSanityVoteDCBBoardTx(voteDCBBoard *transaction.TxVoteD
 }
 
 func (tp *TxPool) validateSanityVoteGOVBoardTx(voteGOVBoard *transaction.TxVoteGOVBoard) (bool, error) {
-	ok, err := tp.validateSanityCustomTokenTxData(&voteGOVBoard.TxCustomToken)
+	ok, err := tp.validateSanityCustomTokenTxData(&voteGOVBoard.TxCustomToken, false)
 	if err != nil || !ok {
 		return ok, err
 	}
@@ -420,6 +480,36 @@ func (tp *TxPool) ValidateTxWithCurrentMempool(tx transaction.Transaction) error
 				return err
 			}
 			return nil
+		}
+	case common.TxBuyFromGOVRequest:
+		{
+			reqTx := tx.(*transaction.TxBuySellRequest)
+			normalTx := reqTx.Tx
+			err := tp.ValidateDoubleSpendTxWithCurrentMempool(normalTx)
+			if err != nil {
+				return err
+			}
+			return nil
+		}
+	case common.TxBuyBackRequest:
+		{
+			reqTx := tx.(*transaction.TxBuyBackRequest)
+			normalTx := reqTx.Tx
+			err := tp.ValidateDoubleSpendTxWithCurrentMempool(*normalTx)
+			if err != nil {
+				return err
+			}
+			return nil
+		}
+	case common.TxBuySellDCBRequest:
+		{
+			txRequest := tx.(*transaction.TxBuySellRequest)
+			return tp.validateTxCustomTokenInPool(txRequest.TxCustomToken)
+		}
+	case common.TxBuySellDCBResponse:
+		{
+			txResponse := tx.(*transaction.TxBuySellDCBResponse)
+			return tp.validateTxCustomTokenInPool(txResponse.TxCustomToken)
 		}
 	default:
 		{
@@ -503,51 +593,31 @@ func (tp *TxPool) ValidateTxWithBlockChain(tx transaction.Transaction, chainID b
 		}
 	case common.TxLoanRequest:
 		{
-			err := blockChain.ValidateTxLoanRequest(tx, chainID)
-			if err != nil {
-				return err
-			}
-			return nil
+			return blockChain.ValidateTxLoanRequest(tx, chainID)
 		}
 	case common.TxLoanResponse:
 		{
-			err := blockChain.ValidateTxLoanResponse(tx, chainID)
-			if err != nil {
-				return err
-			}
-			return nil
+			return blockChain.ValidateTxLoanResponse(tx, chainID)
 		}
 	case common.TxLoanPayment:
 		{
-			err := blockChain.ValidateTxLoanPayment(tx, chainID)
-			if err != nil {
-				return err
-			}
-			return nil
+			return blockChain.ValidateTxLoanPayment(tx, chainID)
 		}
 	case common.TxLoanWithdraw:
 		{
-			err := blockChain.ValidateTxLoanWithdraw(tx, chainID)
-			if err != nil {
-				return err
-			}
-			return nil
+			return blockChain.ValidateTxLoanWithdraw(tx, chainID)
 		}
 	case common.TxDividendPayout:
 		{
-			err := blockChain.ValidateTxDividendPayout(tx, chainID)
-			if err != nil {
-				return err
-			}
-			return nil
+			return blockChain.ValidateTxDividendPayout(tx, chainID)
 		}
 	case common.TxBuySellDCBRequest:
 		{
-			err := blockChain.ValidateTxBuyRequest(tx, chainID)
-			if err != nil {
-				return err
-			}
-			return nil
+			return blockChain.ValidateTxBuySellDCBRequest(tx, chainID)
+		}
+	case common.TxBuySellDCBResponse:
+		{
+			return blockChain.ValidateTxBuySellDCBResponse(tx, chainID)
 		}
 	case common.TxSubmitDCBProposal:
 		{
@@ -573,6 +643,14 @@ func (tp *TxPool) ValidateTxWithBlockChain(tx transaction.Transaction, chainID b
 		{
 			return blockChain.ValidateTxVoteGOVProposal(tx, chainID)
 		}
+	case common.TxBuyFromGOVRequest:
+		{
+			return blockChain.ValidateBuyFromGOVRequestTx(tx, chainID)
+		}
+	case common.TxBuyBackRequest:
+		{
+			return blockChain.ValidateBuyBackRequestTx(tx, chainID)
+		}
 	default:
 		{
 			return errors.New("Wrong tx type")
@@ -581,7 +659,11 @@ func (tp *TxPool) ValidateTxWithBlockChain(tx transaction.Transaction, chainID b
 	return errors.New("No check Tx")
 }
 
-func (tp *TxPool) GetListUTXOForCustomToken(txCustomToken *transaction.TxCustomToken) bool {
+// GetListUTXOFromTxCustomToken - get list utxo with related to vins of a TxCustomToken
+// from vins list of custom token
+// loop and get all older tx custom token which are contained in vins list
+// return map[hash]{instant of custom token tx} for vin of given TxCustomToken
+func (tp *TxPool) GetListUTXOFromTxCustomToken(txCustomToken *transaction.TxCustomToken) bool {
 	data := make(map[common.Hash]transaction.TxCustomToken)
 	for _, vin := range txCustomToken.TxTokenData.Vins {
 		_, _, _, utxo, err := tp.config.BlockChain.GetTransactionByHash(&vin.TxCustomTokenID)
@@ -599,13 +681,15 @@ func (tp *TxPool) GetListUTXOForCustomToken(txCustomToken *transaction.TxCustomT
 	return true
 }
 
+// ValidateTxByItSelf - Each of Tx instance should be validated by it self
+
 func (tp *TxPool) ValidateTxByItSelf(tx transaction.Transaction) bool {
 	switch tx.GetType() {
 	case common.TxCustomTokenType:
 		{
 			// with custom token tx, we need to get utxo for custom token and for validation
 			txCustomToken := tx.(*transaction.TxCustomToken)
-			ok := tp.GetListUTXOForCustomToken(txCustomToken)
+			ok := tp.GetListUTXOFromTxCustomToken(txCustomToken)
 			if ok == false {
 				return false
 			}
@@ -615,7 +699,7 @@ func (tp *TxPool) ValidateTxByItSelf(tx transaction.Transaction) bool {
 		{
 			txVoteDCBBoard := tx.(*transaction.TxVoteDCBBoard)
 			txCustomToken := txVoteDCBBoard.TxCustomToken
-			ok := tp.GetListUTXOForCustomToken(&txCustomToken)
+			ok := tp.GetListUTXOFromTxCustomToken(&txCustomToken)
 			if ok == false {
 				return false
 			}
@@ -625,7 +709,7 @@ func (tp *TxPool) ValidateTxByItSelf(tx transaction.Transaction) bool {
 		{
 			txVoteGOVBoard := tx.(*transaction.TxVoteGOVBoard)
 			txCustomToken := txVoteGOVBoard.TxCustomToken
-			ok := tp.GetListUTXOForCustomToken(&txCustomToken)
+			ok := tp.GetListUTXOFromTxCustomToken(&txCustomToken)
 			if ok == false {
 				return false
 			}
@@ -752,6 +836,16 @@ func (tp *TxPool) CheckTransactionFee(tx transaction.Transaction) (uint64, error
 			err := tp.config.Policy.CheckTransactionFee(normalTx)
 			return normalTx.Fee, err
 		}
+	case common.TxBuySellDCBRequest:
+		{
+			tx := tx.(*transaction.TxBuySellRequest)
+			err := tp.config.Policy.CheckCustomTokenTransactionFee(tx.TxCustomToken)
+			return tx.TxCustomToken.Fee, err
+		}
+	case common.TxBuySellDCBResponse:
+		{
+			return 0, nil // Response tx for sale has no fee
+		}
 	default:
 		{
 			return 0, errors.New("Wrong tx type")
@@ -768,13 +862,13 @@ func (tp *TxPool) ValidateSanityData(tx transaction.Transaction) (bool, error) {
 	case common.TxNormalType, common.TxSalaryType:
 		{
 			txA := tx.(*transaction.Tx)
-			ok, err := tp.validateSanityNormalTxData(txA)
+			ok, err := tp.validateSanityNormalTxData(txA, false)
 			return ok, err
 		}
 	case common.TxCustomTokenType:
 		{
 			txCustomToken := tx.(*transaction.TxCustomToken)
-			ok, err := tp.validateSanityCustomTokenTxData(txCustomToken)
+			ok, err := tp.validateSanityCustomTokenTxData(txCustomToken, false)
 			return ok, err
 		}
 	case common.TxVoteDCBBoard:
@@ -788,6 +882,28 @@ func (tp *TxPool) ValidateSanityData(tx transaction.Transaction) (bool, error) {
 			txVoteGOVBoard := tx.(*transaction.TxVoteGOVBoard)
 			ok, err := tp.validateSanityVoteGOVBoardTx(txVoteGOVBoard)
 			return ok, err
+		}
+	case common.TxBuyFromGOVRequest:
+		{
+			buySellReqTx := tx.(*transaction.TxBuySellRequest)
+			ok, err := tp.validateBuySellReqTxSanity(buySellReqTx, false)
+			return ok, err
+		}
+	case common.TxBuyBackRequest:
+		{
+			buyBackReqTx := tx.(*transaction.TxBuyBackRequest)
+			ok, err := tp.validateBuyBackReqTxSanity(buyBackReqTx, false)
+			return ok, err
+		}
+	case common.TxBuySellDCBRequest:
+		{
+			txRequest := tx.(*transaction.TxBuySellRequest)
+			return tp.validateSanityCustomTokenTxData(txRequest.TxCustomToken, false)
+		}
+	case common.TxBuySellDCBResponse:
+		{
+			txResponse := tx.(*transaction.TxBuySellDCBResponse)
+			return tp.validateSanityCustomTokenTxData(txResponse.TxCustomToken, true)
 		}
 	default:
 		{
