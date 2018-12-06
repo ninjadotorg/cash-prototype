@@ -114,7 +114,7 @@ func (self *BlockChain) ConnectBlock(block *Block) error {
 	}
 
 	// Save loan txs
-	err = self.SaveLoanTxsForBlock(block)
+	err = self.ProcessLoanForBlock(block)
 	if err != nil {
 		return NewBlockChainError(UnExpectedError, err)
 	}
