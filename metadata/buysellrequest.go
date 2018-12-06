@@ -26,7 +26,7 @@ func NewBuySellRequest(bsReqData map[string]interface{}) *BuySellRequest {
 	}
 }
 
-func (bsReq *BuySellRequest) CheckTransactionFee(tr TxRetriever, minFee uint64) bool {
+func (bsReq *BuySellRequest) CheckTransactionFee(tr Transaction, minFee uint64) bool {
 	txFee := tr.GetTxFee()
 	if txFee < minFee {
 		return false
@@ -34,7 +34,7 @@ func (bsReq *BuySellRequest) CheckTransactionFee(tr TxRetriever, minFee uint64) 
 	return true
 }
 
-func (bsReq *BuySellRequest) ValidateTxWithBlockChain(bcr BlockchainRetriever, chainID byte) (bool, error) {
+func (bsReq *BuySellRequest) ValidateTxWithBlockChain(txr Transaction, bcr BlockchainRetriever, chainID byte) (bool, error) {
 	return true, nil
 }
 
