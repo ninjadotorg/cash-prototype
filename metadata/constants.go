@@ -5,4 +5,5 @@ const (
 	LoanRequestMeta
 	BuySellRequestMeta
 	VoteDCBBoardMeta
+	VoteGOVBoardMeta
 )

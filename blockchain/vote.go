@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"github.com/ninjadotorg/constant/common"
 	"github.com/ninjadotorg/constant/database/lvdb"
+	"github.com/ninjadotorg/constant/metadata"
 	"github.com/ninjadotorg/constant/peer"
 	"github.com/ninjadotorg/constant/privacy-protocol"
 	"github.com/ninjadotorg/constant/transaction"
@@ -13,15 +14,16 @@ import (
 	"time"
 )
 
+//Todo: @0xjackalope count by database
 func (blockgen *BlkTmplGenerator) createAcceptConstitutionTxDecs(
 	chainID byte,
 	ConstitutionHelper ConstitutionHelper,
-) (*transaction.TxDesc, error) {
+) (*metadata.TxDesc, error) {
 	BestBlock := blockgen.chain.BestState[chainID].BestBlock
 
 	// count vote from lastConstitution.StartedBlockHeight to Bestblock height
 	CountVote := make(map[common.Hash]int64)
-	Transaction := make(map[common.Hash]*transaction.Transaction)
+	Transaction := make(map[common.Hash]*metadata.Transaction)
 	for blockHeight := ConstitutionHelper.GetStartedBlockHeight(blockgen, chainID); blockHeight < BestBlock.Header.Height; blockHeight += 1 {
 		//retrieve block from block's height
 		hashBlock, err := blockgen.chain.config.DataBase.GetBlockByIndex(blockHeight, chainID)
@@ -69,7 +71,7 @@ func (blockgen *BlkTmplGenerator) createAcceptConstitutionTxDecs(
 
 	acceptedSubmitProposalTransaction := ConstitutionHelper.TxAcceptProposal(*Transaction[res])
 
-	AcceptedTransactionDesc := transaction.TxDesc{
+	AcceptedTransactionDesc := metadata.TxDesc{
 		Tx:     acceptedSubmitProposalTransaction,
 		Added:  time.Now(),
 		Height: BestBlock.Header.Height,
@@ -78,7 +80,7 @@ func (blockgen *BlkTmplGenerator) createAcceptConstitutionTxDecs(
 	return &AcceptedTransactionDesc, nil
 }
 
-func (blockgen *BlkTmplGenerator) createSingleSendDCBVoteTokenTx(chainID string,pubKey []byte, amount uint64) (transaction.Transaction, error) {
+func (blockgen *BlkTmplGenerator) createSingleSendDCBVoteTokenTx(chainID string,pubKey []byte, amount uint64) (metadata.Transaction, error) {
 
 	paymentAddress := privacy.PaymentAddress{
 		Pk: pubKey,
@@ -106,9 +108,9 @@ func getAmountOfVoteToken(sumAmount uint64, voteAmount uint64) uint64 {
 	return voteAmount * common.SumOfVoteDCBToken / sumAmount
 }
 
-func (blockgen *BlkTmplGenerator) CreateSendDCBVoteTokenToGovernorTx(chainID string, newDCBList lvdb.CandidateList, sumAmountDCB uint64) ([]transaction.Transaction) {
-	var SendVoteTx []transaction.Transaction
-	var newTx transaction.Transaction
+func (blockgen *BlkTmplGenerator) CreateSendDCBVoteTokenToGovernorTx(chainID string, newDCBList lvdb.CandidateList, sumAmountDCB uint64) ([]metadata.Transaction) {
+	var SendVoteTx []metadata.Transaction
+	var newTx metadata.Transaction
 	for i := 0; i <= NumberOfDCBGovernors; i++ {
 		newTx, _ = blockgen.createSingleSendDCBVoteTokenTx(chainID, newDCBList[i].PubKey, getAmountOfVoteToken(sumAmountDCB, newDCBList[i].VoteAmount))
 		SendVoteTx = append(SendVoteTx, newTx)
@@ -130,7 +132,7 @@ func (blockgen *BlkTmplGenerator) createAcceptGOVBoardTx(GOVBoardPubKeys []strin
 	}
 }
 
-func (block *Block) UpdateDCBBoard(thisTx transaction.Transaction) error {
+func (block *Block) UpdateDCBBoard(thisTx metadata.Transaction) error {
 	tx := thisTx.(transaction.TxAcceptDCBBoard)
 	block.Header.DCBGovernor.DCBBoardPubKeys = tx.DCBBoardPubKeys
 	block.Header.DCBGovernor.StartedBlock = uint32(block.Header.Height)
@@ -139,7 +141,7 @@ func (block *Block) UpdateDCBBoard(thisTx transaction.Transaction) error {
 	return nil
 }
 
-func (block *Block) UpdateGOVBoard(thisTx transaction.Transaction) error {
+func (block *Block) UpdateGOVBoard(thisTx metadata.Transaction) error {
 	tx := thisTx.(transaction.TxAcceptGOVBoard)
 	block.Header.GOVGovernor.GOVBoardPubKeys = tx.GOVBoardPubKeys
 	block.Header.GOVGovernor.StartedBlock = uint32(block.Header.Height)
@@ -160,7 +162,7 @@ func parseVoteDCBBoardListValue(value []byte) ([]byte, uint64){
 	// Todo xxx
 }
 
-func createSingleSendDCBVoteTokenFail(pubKey []byte, amount uint64) transaction.Transaction{
+func createSingleSendDCBVoteTokenFail(pubKey []byte, amount uint64) metadata.Transaction{
 	paymentAddress := privacy.PaymentAddress{
 		Pk: pubKey,
 	}
@@ -192,7 +194,7 @@ func (blockgen *BlkTmplGenerator) CreateSendBackDCBTokenAfterVoteInPool(chainID 
 	searchRange := util.Range{begin, end}
 
 	iter := blockgen.chain.config.DataBase.NewIterator( &searchRange, nil)
-	listNewTx := make([]transaction.Transaction,0)
+	listNewTx := make([]metadata.Transaction,0)
 	for iter.Next() {
 		key := iter.Key()
 		startedBlock, PubKey, _ := parseVoteDCBBoardListKey(key)

@@ -13,17 +13,6 @@ const (
 	TxCustomTokenType        = "t" // token  tx with no supporting privacy
 	TxCustomTokenPrivacyType = "t" // token  tx with supporting privacy
 
-	TxSubmitDCBProposal = "pd"  // submit DCB proposal tx
-	TxSubmitGOVProposal = "pg"  // submit GOV proposal tx
-	TxVoteDCBProposal   = "vd"  // submit DCB proposal voted tx
-	TxVoteGOVProposal   = "vg"  // submit GOV proposal voted tx
-	TxVoteDCBBoard      = "vbd" // vote DCB board tx
-	TxVoteGOVBoard      = "vbg" // vote DCB board tx
-	TxAcceptDCBBoard    = "adb" //accept new DCB board
-	TxAcceptGOVBoard    = "agb" //accept new GOV board
-	TxAcceptDCBProposal = "ad"  // accept DCB proposal
-	TxAcceptGOVProposal = "ag"  // accept GOV proposal
-
 	TxLoanResponse = "ls" // DCB accept/reject a loan request
 	TxLoanPayment  = "lp" // user makes payment of a loan
 	TxLoanWithdraw = "lw" // user provides key to withdraw locked constant

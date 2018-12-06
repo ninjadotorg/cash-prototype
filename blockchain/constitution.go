@@ -35,7 +35,7 @@ func (DCBConstitutionHelper) GetStartedBlockHeight(blockgen *BlkTmplGenerator, c
 }
 
 func (DCBConstitutionHelper) CheckSubmitProposalType(tx metadata.Transaction) bool {
-	return tx.GetType() == common.TxSubmitDCBProposal
+	return tx.GetType() == metadata.TxSubmitDCBProposal
 }
 
 func (DCBConstitutionHelper) CheckVotingProposalType(tx metadata.Transaction) bool {
