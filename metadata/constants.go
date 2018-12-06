@@ -4,4 +4,5 @@ const (
 	InvalidMeta = iota
 	LoanRequestMeta
 	BuySellRequestMeta
+	VoteDCBBoardMeta
 )
