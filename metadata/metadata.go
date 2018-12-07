@@ -58,6 +58,8 @@ type BlockchainRetriever interface {
 	GetDCBBoardPubKeys() []string
 	GetTransactionByHash(*common.Hash) (byte, *common.Hash, int, Transaction, error)
 	GetLoanTxs([]byte) ([][]byte, error)
+	GetNumberOfDCBGovernors() int
+	GetNumberOfGOVGovernors() int
 }
 
 type Metadata interface {
@@ -65,7 +67,7 @@ type Metadata interface {
 	Hash() *common.Hash
 	CheckTransactionFee(Transaction, uint64) bool
 	ValidateTxWithBlockChain(Transaction, BlockchainRetriever, byte) (bool, error)
-	ValidateSanityData() (bool, bool, error)
+	ValidateSanityData(BlockchainRetriever) (bool, bool, error)
 	ValidateMetadataByItself() bool // TODO: need to define the method for metadata
 }
 
@@ -85,7 +87,7 @@ type Transaction interface {
 	IsSalaryTx() bool
 	ValidateTxWithCurrentMempool(MempoolRetriever) error
 	ValidateTxWithBlockChain(BlockchainRetriever, byte) error
-	ValidateSanityData() (bool, error)
+	ValidateSanityData(BlockchainRetriever) (bool, error)
 	ValidateTxByItself(BlockchainRetriever) bool
 	GetMetadata() Metadata
 }

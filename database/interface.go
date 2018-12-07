@@ -2,7 +2,6 @@ package database
 
 import (
 	"github.com/ninjadotorg/constant/common"
-	"github.com/ninjadotorg/constant/database/lvdb"
 	"github.com/ninjadotorg/constant/privacy-protocol"
 	"github.com/ninjadotorg/constant/transaction"
 	"github.com/ninjadotorg/constant/voting"
@@ -81,10 +80,13 @@ type DatabaseInterface interface {
 	//Vote
 	AddVoteDCBBoard(uint32, string, string, uint64) error
 	AddVoteGOVBoard(uint32, string, string, uint64) error
-	GetTopMostVoteDCBGovernor(uint32) (lvdb.CandidateList, error)
-	GetTopMostVoteGOVGovernor(uint32) (lvdb.CandidateList, error)
+	GetTopMostVoteDCBGovernor(uint32) (CandidateList, error)
+	GetTopMostVoteGOVGovernor(uint32) (CandidateList, error)
 	NewIterator(*util.Range, *opt.ReadOptions) iterator.Iterator
 	GetKey(string, interface{}) []byte
+	GetVoteDCBBoardListPrefix() []byte
+	GetVoteGOVBoardListPrefix() []byte
+	ReverseGetKey(string, []byte) (interface{}, error)
 
 	Close() error
 }

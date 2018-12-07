@@ -2,12 +2,12 @@ package transaction
 
 type TxAcceptDCBBoard struct {
 	*Tx
-	DCBBoardPubKeys     []string
+	DCBBoardPubKeys     [][]byte
 	StartAmountDCBToken uint64
 }
 
 type TxAcceptGOVBoard struct {
 	*Tx
-	GOVBoardPubKeys     []string
+	GOVBoardPubKeys     [][]byte
 	StartAmountGOVToken uint64
 }

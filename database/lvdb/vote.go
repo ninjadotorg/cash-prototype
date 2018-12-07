@@ -12,10 +12,10 @@ import (
 	"github.com/syndtr/goleveldb/leveldb/util"
 )
 
-func (db *db) AddVoteDCBBoard(StartedBlockInt int32, VoterPubKey string, CandidatePubKey string, amount uint64) error {
+func (db *db) AddVoteDCBBoard(StartedBlockInt int32, VoterPubKey []byte, CandidatePubKey []byte, amount uint64) error {
 	StartedBlock := uint32(StartedBlockInt)
 	//add to sum amount of vote token to this candidate
-	key := db.GetKey(string(VoteDCBBoardSumPrefix), string(StartedBlock)+CandidatePubKey)
+	key := db.GetKey(string(voteDCBBoardSumPrefix), string(StartedBlock)+string(CandidatePubKey))
 	ok, err := db.hasValue(key)
 	if err != nil {
 		return err
@@ -38,7 +38,7 @@ func (db *db) AddVoteDCBBoard(StartedBlockInt int32, VoterPubKey string, Candida
 	}
 
 	// add to count amount of vote to this candidate
-	key = db.GetKey(string(VoteDCBBoardCountPrefix), string(StartedBlock)+CandidatePubKey)
+	key = db.GetKey(string(voteDCBBoardCountPrefix), string(StartedBlock)+string(CandidatePubKey))
 	currentCountInBytes, err := db.lvdb.Get(key, nil)
 	if err != nil {
 		return err
@@ -53,7 +53,7 @@ func (db *db) AddVoteDCBBoard(StartedBlockInt int32, VoterPubKey string, Candida
 	}
 
 	// add to list voter new voter base on count as index
-	key = db.GetKey(string(VoteDCBBoardListPrefix), string(currentCount)+string(StartedBlock)+CandidatePubKey)
+	key = db.GetKey(string(VoteDCBBoardListPrefix), string(currentCount)+string(StartedBlock)+string(CandidatePubKey))
 	amountInByte := make([]byte, 8)
 	binary.LittleEndian.PutUint64(amountInByte, amount)
 	valueInByte := append([]byte(VoterPubKey), amountInByte...)
@@ -62,9 +62,10 @@ func (db *db) AddVoteDCBBoard(StartedBlockInt int32, VoterPubKey string, Candida
 	return nil
 }
 
-func (db *db) AddVoteGOVBoard(StartedBlock uint32, VoterPubKey string, CandidatePubKey string, amount uint64) error {
+func (db *db) AddVoteGOVBoard(StartedBlockInt int32, VoterPubKey []byte, CandidatePubKey []byte, amount uint64) error {
+	StartedBlock := uint32(StartedBlockInt)
 	//add to sum amount of vote token to this candidate
-	key := db.GetKey(string(VoteGOVBoardSumPrefix), string(StartedBlock)+CandidatePubKey)
+	key := db.GetKey(string(voteGOVBoardSumPrefix), string(StartedBlock)+string(CandidatePubKey))
 	ok, err := db.hasValue(key)
 	if err != nil {
 		return err
@@ -87,7 +88,7 @@ func (db *db) AddVoteGOVBoard(StartedBlock uint32, VoterPubKey string, Candidate
 	}
 
 	// add to count amount of vote to this candidate
-	key = db.GetKey(string(VoteGOVBoardCountPrefix), string(StartedBlock)+CandidatePubKey)
+	key = db.GetKey(string(voteGOVBoardCountPrefix), string(StartedBlock)+string(CandidatePubKey))
 	currentCountInBytes, err := db.lvdb.Get(key, nil)
 	if err != nil {
 		return err
@@ -102,39 +103,26 @@ func (db *db) AddVoteGOVBoard(StartedBlock uint32, VoterPubKey string, Candidate
 	}
 
 	// add to list voter new voter base on count as index
-	key = db.GetKey(string(VoteGOVBoardListPrefix), string(StartedBlock)+CandidatePubKey+string(currentCount))
-	err = db.put(key, []byte(VoterPubKey))
+	key = db.GetKey(string(VoteGOVBoardListPrefix), string(currentCount)+string(StartedBlock)+string(CandidatePubKey))
+	amountInByte := make([]byte, 8)
+	binary.LittleEndian.PutUint64(amountInByte, amount)
+	valueInByte := append([]byte(VoterPubKey), amountInByte...)
+	err = db.put(key, valueInByte)
 
 	return nil
 }
 
-type CandidateElement struct {
-	PubKey     []byte
-	VoteAmount uint64
-}
-
-type CandidateList []CandidateElement
-
-func (A CandidateList) Len() int {
-	return len(A)
-}
-func (A CandidateList) Swap(i, j int) {
-	A[i], A[j] = A[j], A[i]
-}
-func (A CandidateList) Less(i, j int) bool {
-	return A[i].VoteAmount < A[j].VoteAmount
-}
-
-func (db *db) GetTopMostVoteDCBGovernor(number uint32, StartedBlock uint32) (CandidateList, error) {
-	var candidateList CandidateList
+func (db *db) GetTopMostVoteDCBGovernor(number uint32, StartedBlock uint32) (database.CandidateList, error) {
+	var candidateList database.CandidateList
 	//use prefix  as in file lvdb/block.go FetchChain
-	prefix := db.GetKey(string(VoteDCBBoardSumPrefix), string(StartedBlock))
+	prefix := db.GetKey(string(voteDCBBoardSumPrefix), string(StartedBlock))
 	iter := db.lvdb.NewIterator(util.BytesPrefix(prefix), nil)
 	for iter.Next() {
-		key := db.reverseGetKey(string(VoteDCBBoardSumPrefix), iter.Key()).(string)
+		keyI, _ := ReverseGetKey(string(voteDCBBoardSumPrefix), iter.Key())
+		key := keyI.([]byte)
 		pubKey := key[len(string(StartedBlock)+"#"):]
 		value := binary.LittleEndian.Uint64(iter.Value())
-		candidateList = append(candidateList, CandidateElement{pubKey, value})
+		candidateList = append(candidateList, database.CandidateElement{pubKey, value})
 	}
 	sort.Sort(candidateList)
 	if len(candidateList) < blockchain.NumberOfDCBGovernors {
@@ -144,17 +132,17 @@ func (db *db) GetTopMostVoteDCBGovernor(number uint32, StartedBlock uint32) (Can
 	return candidateList[len(candidateList)-blockchain.NumberOfDCBGovernors:], nil
 }
 
-func (db *db) GetTopMostVoteGOVGovernor(number uint32, StartedBlock uint32) (CandidateList, error) {
-	var candidateList CandidateList
+func (db *db) GetTopMostVoteGOVGovernor(number uint32, StartedBlock uint32) (database.CandidateList, error) {
+	var candidateList database.CandidateList
 	//use prefix  as in file lvdb/block.go FetchChain
-	prefix := db.GetKey(string(VoteGOVBoardSumPrefix), string(StartedBlock))
-
+	prefix := db.GetKey(string(voteGOVBoardSumPrefix), string(StartedBlock))
 	iter := db.lvdb.NewIterator(util.BytesPrefix(prefix), nil)
 	for iter.Next() {
-		key := db.reverseGetKey(string(VoteGOVBoardSumPrefix), iter.Key()).(string)
+		keyI, _ := ReverseGetKey(string(voteGOVBoardSumPrefix), iter.Key())
+		key := keyI.([]byte)
 		pubKey := key[len(string(StartedBlock)+"#"):]
 		value := binary.LittleEndian.Uint64(iter.Value())
-		candidateList = append(candidateList, CandidateElement{pubKey, value})
+		candidateList = append(candidateList, database.CandidateElement{pubKey, value})
 	}
 	sort.Sort(candidateList)
 	if len(candidateList) < blockchain.NumberOfGOVGovernors {
@@ -166,4 +154,12 @@ func (db *db) GetTopMostVoteGOVGovernor(number uint32, StartedBlock uint32) (Can
 
 func (db *db) NewIterator(slice *util.Range, ro *opt.ReadOptions) iterator.Iterator {
 	return db.lvdb.NewIterator(slice, ro)
+}
+
+func (db *db) GetVoteDCBBoardListPrefix() []byte {
+	return VoteDCBBoardListPrefix
+}
+
+func (db *db) GetVoteGOVBoardListPrefix() []byte {
+	return VoteGOVBoardListPrefix
 }

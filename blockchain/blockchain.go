@@ -665,19 +665,23 @@ func (self *BlockChain) UpdateVoteCountBoard(block *Block) error {
 	DCBEndedBlock := block.Header.DCBGovernor.EndBlock
 	GOVEndedBlock := block.Header.GOVGovernor.EndBlock
 	for _, tx := range block.Transactions {
-		switch tx.GetType() {
-		case common.TxVoteDCBBoard:
+		switch tx.GetMetadataType() {
+		case metadata.VoteDCBBoard:
 			{
-				tx := tx.(*transaction.TxVoteDCBBoard)
-				err := self.config.DataBase.AddVoteDCBBoard(DCBEndedBlock, string(tx.TxTokenData.Vins[0].PaymentAddress.Pk), tx.VoteDCBBoardData.CandidatePubKey, tx.TxTokenData.Amount)
+				tx := tx.(*transaction.TxCustomToken)
+				voteAmount := tx.GetAmountOfVote()
+				voteDCBBoardMetadata := tx.Metadata.(*metadata.VoteDCBBoardMetadata)
+				err := self.config.DataBase.AddVoteDCBBoard(DCBEndedBlock, string(tx.TxTokenData.Vins[0].PaymentAddress.Pk), voteDCBBoardMetadata.CandidatePubKey, voteAmount)
 				if err != nil {
 					return err
 				}
 			}
-		case common.TxVoteGOVBoard:
+		case metadata.VoteGOVBoard:
 			{
-				tx := tx.(*transaction.TxVoteGOVBoard)
-				err := self.config.DataBase.AddVoteGOVBoard(GOVEndedBlock, string(tx.TxTokenData.Vins[0].PaymentAddress.Pk), tx.VoteGOVBoardData.CandidatePubKey, tx.TxTokenData.Amount)
+				tx := tx.(*transaction.TxCustomToken)
+				voteAmount := tx.GetAmountOfVote()
+				voteGOVBoardMetadata := tx.Metadata.(*metadata.VoteGOVBoardMetadata)
+				err := self.config.DataBase.AddVoteGOVBoard(GOVEndedBlock, string(tx.TxTokenData.Vins[0].PaymentAddress.Pk), voteGOVBoardMetadata.CandidatePubKey, voteAmount)
 				if err != nil {
 					return err
 				}
@@ -689,8 +693,8 @@ func (self *BlockChain) UpdateVoteCountBoard(block *Block) error {
 
 func (self *BlockChain) ProcessCrowdsaleTxs(block *Block) error {
 	for _, tx := range block.Transactions {
-		switch tx.GetType() {
-		case common.TxAcceptDCBProposal:
+		switch tx.GetMetadataType() {
+		case metadata.VoteDCBBoard:
 			{
 				txAccepted := tx.(*transaction.TxAcceptDCBProposal)
 				_, _, _, getTx, err := self.GetTransactionByHash(txAccepted.DCBProposalTXID)
@@ -1309,4 +1313,8 @@ func (self *BlockChain) GetListTokenHolders(tokenID *common.Hash) (map[string]ui
 
 func (self *BlockChain) GetCustomTokenRewardSnapshot() map[string]uint64 {
 	return self.config.customTokenRewardSnapshot
+}
+
+func (self *BlockChain) GetNumberOfDCBGovernors() int {
+	return NumberOfDCBGovernors
 }

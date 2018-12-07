@@ -80,7 +80,9 @@ func (db *db) FetchBlock(hash *common.Hash) ([]byte, error) {
 	if err != nil {
 		return nil, database.NewDatabaseError(database.UnexpectedError, errors.Wrap(err, "db.lvdb.Get"))
 	}
-ret := make([]byte, len(block)) copy(ret, block) return ret, nil
+	ret := make([]byte, len(block))
+	copy(ret, block)
+	return ret, nil
 }
 
 func (db *db) DeleteBlock(hash *common.Hash, idx int32, chainID byte) error {
@@ -163,7 +165,9 @@ func (db *db) GetIndexOfBlock(h *common.Hash) (int32, byte, error) {
 	var chainID byte
 	if err := binary.Read(bytes.NewReader(b[:4]), binary.LittleEndian, &idx); err != nil {
 		return 0, 0, database.NewDatabaseError(database.UnexpectedError, errors.Wrap(err, "binary.Read"))
-	} if err = binary.Read(bytes.NewReader(b[4:]), binary.LittleEndian, &chainID); err != nil { return 0, 0, database.NewDatabaseError(database.UnexpectedError, errors.Wrap(err, "binary.Read"))
+	}
+	if err = binary.Read(bytes.NewReader(b[4:]), binary.LittleEndian, &chainID); err != nil {
+		return 0, 0, database.NewDatabaseError(database.UnexpectedError, errors.Wrap(err, "binary.Read"))
 	}
 	return idx, chainID, nil
 }

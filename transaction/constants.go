@@ -29,4 +29,7 @@ const (
 	VoteDCBBoard
 	VoteGOVBoard
 	SendBackDCBTokenVoteFail
+	SendBackGOVTokenVoteFail
+
+	//to remove
 )
