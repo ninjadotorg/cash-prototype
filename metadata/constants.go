@@ -13,6 +13,7 @@ const (
 	LoanUnlockMeta
 	LoanPaymentMeta
 	BuySellRequestMeta
+	DividendMeta
 
 	//Voting
 	SubmitDCBProposalMeta
@@ -26,4 +27,9 @@ const (
 	VoteGOVBoardMeta
 	AcceptGOVProposalMeta
 	AcceptGOVBoardMeta
+)
+
+const (
+	MaxDivTxsPerBlock = 1000
+	PayoutFrequency   = 1000 // Payout dividend every 1000 blocks
 )

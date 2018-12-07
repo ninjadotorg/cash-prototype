@@ -13,7 +13,6 @@ const (
 	TxCustomTokenType        = "t" // token  tx with no supporting privacy
 	TxCustomTokenPrivacyType = "t" // token  tx with supporting privacy
 
-	TxDividendPayout     = "td"
 	TxBuyFromGOVRequest  = "bgr"
 	TxBuySellDCBRequest  = "bsdr"
 	TxBuySellDCBResponse = "bsds"
