@@ -116,7 +116,7 @@ func (db db) GetKey(keyType string, key interface{}) []byte {
 }
 
 // get real PubKey from dbkey
-func ReverseGetKey(keyType string, dbkey []byte) (interface{}, error) {
+func (db db) ReverseGetKey(keyType string, dbkey []byte) (interface{}, error) {
 	var key interface{}
 	switch keyType {
 	case string(voteDCBBoardSumPrefix):

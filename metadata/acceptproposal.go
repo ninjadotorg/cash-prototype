@@ -35,7 +35,7 @@ func (acceptDCBProposalMetadata *AcceptDCBProposalMetadata) Hash() *common.Hash 
 	return &hash
 }
 
-func (acceptDCBProposalMetadata *AcceptDCBProposalMetadata) ValidateSanityData() (bool, bool, error) {
+func (acceptDCBProposalMetadata *AcceptDCBProposalMetadata) ValidateSanityData(bcr BlockchainRetriever, tx Transaction) (bool, bool, error) {
 	return true, true, nil
 }
 
@@ -76,7 +76,7 @@ func (acceptGOVProposalMetadata *AcceptGOVProposalMetadata) Hash() *common.Hash 
 	return &hash
 }
 
-func (acceptGOVProposalMetadata *AcceptGOVProposalMetadata) ValidateSanityData() (bool, bool, error) {
+func (acceptGOVProposalMetadata *AcceptGOVProposalMetadata) ValidateSanityData(bcr BlockchainRetriever, tx Transaction) (bool, bool, error) {
 	return true, true, nil
 }
 

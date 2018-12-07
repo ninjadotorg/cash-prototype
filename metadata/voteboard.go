@@ -5,14 +5,14 @@ import (
 )
 
 type VoteDCBBoardMetadata struct {
-	CandidatePubKey string
+	CandidatePubKey []byte
 
 	MetadataBase
 }
 
 func NewVoteDCBBoardMetadata(voteDCBBoardMetadata map[string]interface{}) *VoteDCBBoardMetadata {
 	return &VoteDCBBoardMetadata{
-		CandidatePubKey: voteDCBBoardMetadata["candidatePubKey"].(string),
+		CandidatePubKey: voteDCBBoardMetadata["candidatePubKey"].([]byte),
 	}
 }
 
@@ -30,7 +30,7 @@ func (voteDCBBoardMetadata *VoteDCBBoardMetadata) Hash() *common.Hash {
 	return &hash
 }
 
-func (voteDCBBoardMetadata *VoteDCBBoardMetadata) ValidateSanityData() (bool, bool, error) {
+func (voteDCBBoardMetadata *VoteDCBBoardMetadata) ValidateSanityData(bcr BlockchainRetriever, tx Transaction) (bool, bool, error) {
 	return true, true, nil
 }
 
@@ -39,14 +39,14 @@ func (voteDCBBoardMetadata *VoteDCBBoardMetadata) ValidateMetadataByItself() boo
 }
 
 type VoteGOVBoardMetadata struct {
-	CandidatePubKey string
+	CandidatePubKey []byte
 
 	MetadataBase
 }
 
 func NewVoteGOVBoardMetadata(voteGOVBoardMetadata map[string]interface{}) *VoteGOVBoardMetadata {
 	return &VoteGOVBoardMetadata{
-		CandidatePubKey: voteGOVBoardMetadata["candidatePubKey"].(string),
+		CandidatePubKey: voteGOVBoardMetadata["candidatePubKey"].([]byte),
 	}
 }
 
@@ -63,7 +63,7 @@ func (voteGOVBoardMetadata *VoteGOVBoardMetadata) Hash() *common.Hash {
 	return &hash
 }
 
-func (voteGOVBoardMetadata *VoteGOVBoardMetadata) ValidateSanityData() (bool, bool, error) {
+func (voteGOVBoardMetadata *VoteGOVBoardMetadata) ValidateSanityData(bcr BlockchainRetriever, tx Transaction) (bool, bool, error) {
 	return true, true, nil
 }
 

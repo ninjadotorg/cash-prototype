@@ -71,7 +71,7 @@ func (self *BlockChain) GetHeight() int32 {
 	return self.BestState[0].BestBlock.Header.Height
 }
 
-func (self *BlockChain) GetDCBBoardPubKeys() []string {
+func (self *BlockChain) GetDCBBoardPubKeys() [][]byte {
 	return self.BestState[0].BestBlock.Header.DCBGovernor.DCBBoardPubKeys
 }
 
@@ -79,8 +79,16 @@ func (self *BlockChain) GetDCBParams() params.DCBParams {
 	return self.BestState[0].BestBlock.Header.DCBConstitution.DCBParams
 }
 
+func (self *BlockChain) GetGOVParams() params.GOVParams {
+	return self.BestState[0].BestBlock.Header.GOVConstitution.GOVParams
+}
+
 func (self *BlockChain) GetLoanTxs(loanID []byte) ([][]byte, error) {
 	return self.config.DataBase.GetLoanTxs(loanID)
+}
+
+func (self *BlockChain) GetLoanPayment(loanID []byte) (uint64, uint64, uint32, error) {
+	return self.config.DataBase.GetLoanPayment(loanID)
 }
 
 /*
@@ -525,7 +533,7 @@ func (self *BlockChain) GetAllHashBlocks() (map[byte][]*common.Hash, error) {
 	return data, err
 }
 
-func (self *BlockChain) getLoanRequestMeta(loanID []byte) (*metadata.LoanRequest, error) {
+func (self *BlockChain) GetLoanRequestMeta(loanID []byte) (*metadata.LoanRequest, error) {
 	txs, err := self.config.DataBase.GetLoanTxs(loanID)
 	if err != nil {
 		return nil, err
@@ -555,9 +563,10 @@ func (self *BlockChain) getLoanRequestMeta(loanID []byte) (*metadata.LoanRequest
 	return nil, nil
 }
 
-func (self *BlockChain) ProcessLoanPayment(tx *transaction.TxLoanPayment) error {
+func (self *BlockChain) ProcessLoanPayment(tx metadata.Transaction) error {
 	value := uint64(0)
-	for _, desc := range tx.Descs {
+	txNormal := tx.(*transaction.Tx)
+	for _, desc := range txNormal.Descs {
 		for _, note := range desc.Note {
 			accountDCB, _ := wallet.Base58CheckDeserialize(common.DCBAddress)
 			dcbPk := accountDCB.KeySet.PaymentAddress.Pk
@@ -566,8 +575,9 @@ func (self *BlockChain) ProcessLoanPayment(tx *transaction.TxLoanPayment) error 
 			}
 		}
 	}
-	principle, interest, deadline, err := self.config.DataBase.GetLoanPayment(tx.LoanID)
-	if tx.PayPrinciple {
+	meta := tx.GetMetadata().(*metadata.LoanPayment)
+	principle, interest, deadline, err := self.config.DataBase.GetLoanPayment(meta.LoanID)
+	if meta.PayPrinciple {
 		if err != nil {
 			return err
 		}
@@ -576,11 +586,11 @@ func (self *BlockChain) ProcessLoanPayment(tx *transaction.TxLoanPayment) error 
 		}
 		principle -= value
 	} else {
-		meta, err := self.getLoanRequestMeta(tx.LoanID)
+		requestMeta, err := self.GetLoanRequestMeta(meta.LoanID)
 		if err != nil {
 			return err
 		}
-		interestPerPeriod := GetInterestAmount(principle, meta.Params.InterestRate)
+		interestPerPeriod := GetInterestAmount(principle, requestMeta.Params.InterestRate)
 		periodInc := uint32(0)
 		if value < interest {
 			interest -= value
@@ -588,30 +598,12 @@ func (self *BlockChain) ProcessLoanPayment(tx *transaction.TxLoanPayment) error 
 			periodInc = 1 + uint32((value-interest)/interestPerPeriod)
 			interest = interestPerPeriod - (value-interest)%interestPerPeriod
 		}
-		deadline = deadline + periodInc*meta.Params.Maturity
+		deadline = deadline + periodInc*requestMeta.Params.Maturity
 	}
-	return self.config.DataBase.StoreLoanPayment(tx.LoanID, principle, interest, deadline)
+	return self.config.DataBase.StoreLoanPayment(meta.LoanID, principle, interest, deadline)
 }
 
 func (self *BlockChain) ProcessLoanForBlock(block *Block) error {
-	for _, tx := range block.Transactions {
-		switch tx.GetType() {
-		case common.TxLoanUnlock:
-			{
-				// Update loan payment info after withdrawing Constant
-				tx := tx.(*transaction.TxLoanUnlock)
-				meta, _ := self.getLoanRequestMeta(tx.LoanID)
-				principle := meta.LoanAmount
-				interest := GetInterestAmount(principle, meta.Params.InterestRate)
-				self.config.DataBase.StoreLoanPayment(tx.LoanID, principle, interest, uint32(block.Header.Height))
-			}
-		case common.TxLoanPayment:
-			{
-				tx := tx.(*transaction.TxLoanPayment)
-				self.ProcessLoanPayment(tx)
-			}
-		}
-	}
 	for _, tx := range block.Transactions {
 		switch tx.GetMetadataType() {
 		case metadata.LoanRequestMeta:
@@ -625,6 +617,20 @@ func (self *BlockChain) ProcessLoanForBlock(block *Block) error {
 				tx := tx.(*transaction.Tx)
 				meta := tx.Metadata.(*metadata.LoanResponse)
 				self.config.DataBase.StoreLoanResponse(meta.LoanID, tx.Hash()[:])
+			}
+		case metadata.LoanUnlockMeta:
+			{
+				// Update loan payment info after withdrawing Constant
+				tx := tx.(*transaction.Tx)
+				meta := tx.GetMetadata().(*metadata.LoanUnlock)
+				requestMeta, _ := self.GetLoanRequestMeta(meta.LoanID)
+				principle := requestMeta.LoanAmount
+				interest := GetInterestAmount(principle, requestMeta.Params.InterestRate)
+				self.config.DataBase.StoreLoanPayment(meta.LoanID, principle, interest, uint32(block.Header.Height))
+			}
+		case metadata.LoanPaymentMeta:
+			{
+				self.ProcessLoanPayment(tx)
 			}
 		}
 	}
@@ -666,22 +672,22 @@ func (self *BlockChain) UpdateVoteCountBoard(block *Block) error {
 	GOVEndedBlock := block.Header.GOVGovernor.EndBlock
 	for _, tx := range block.Transactions {
 		switch tx.GetMetadataType() {
-		case metadata.VoteDCBBoard:
+		case metadata.VoteDCBBoardMeta:
 			{
 				tx := tx.(*transaction.TxCustomToken)
 				voteAmount := tx.GetAmountOfVote()
 				voteDCBBoardMetadata := tx.Metadata.(*metadata.VoteDCBBoardMetadata)
-				err := self.config.DataBase.AddVoteDCBBoard(DCBEndedBlock, string(tx.TxTokenData.Vins[0].PaymentAddress.Pk), voteDCBBoardMetadata.CandidatePubKey, voteAmount)
+				err := self.config.DataBase.AddVoteDCBBoard(DCBEndedBlock, tx.TxTokenData.Vins[0].PaymentAddress.Pk, voteDCBBoardMetadata.CandidatePubKey, voteAmount)
 				if err != nil {
 					return err
 				}
 			}
-		case metadata.VoteGOVBoard:
+		case metadata.VoteGOVBoardMeta:
 			{
 				tx := tx.(*transaction.TxCustomToken)
 				voteAmount := tx.GetAmountOfVote()
 				voteGOVBoardMetadata := tx.Metadata.(*metadata.VoteGOVBoardMetadata)
-				err := self.config.DataBase.AddVoteGOVBoard(GOVEndedBlock, string(tx.TxTokenData.Vins[0].PaymentAddress.Pk), voteGOVBoardMetadata.CandidatePubKey, voteAmount)
+				err := self.config.DataBase.AddVoteGOVBoard(GOVEndedBlock, tx.TxTokenData.Vins[0].PaymentAddress.Pk, voteGOVBoardMetadata.CandidatePubKey, voteAmount)
 				if err != nil {
 					return err
 				}
@@ -694,7 +700,7 @@ func (self *BlockChain) UpdateVoteCountBoard(block *Block) error {
 func (self *BlockChain) ProcessCrowdsaleTxs(block *Block) error {
 	for _, tx := range block.Transactions {
 		switch tx.GetMetadataType() {
-		case metadata.VoteDCBBoard:
+		case metadata.VoteDCBBoardMeta:
 			{
 				txAccepted := tx.(*transaction.TxAcceptDCBProposal)
 				_, _, _, getTx, err := self.GetTransactionByHash(txAccepted.DCBProposalTXID)
@@ -1317,4 +1323,7 @@ func (self *BlockChain) GetCustomTokenRewardSnapshot() map[string]uint64 {
 
 func (self *BlockChain) GetNumberOfDCBGovernors() int {
 	return NumberOfDCBGovernors
+}
+func (self *BlockChain) GetNumberOfGOVGovernors() int {
+	return NumberOfGOVGovernors
 }

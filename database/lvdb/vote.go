@@ -12,7 +12,7 @@ import (
 	"github.com/syndtr/goleveldb/leveldb/util"
 )
 
-func (db *db) AddVoteDCBBoard(StartedBlockInt int32, VoterPubKey []byte, CandidatePubKey []byte, amount uint64) error {
+func (db *db) AddVoteDCBBoard(StartedBlockInt uint32, VoterPubKey []byte, CandidatePubKey []byte, amount uint64) error {
 	StartedBlock := uint32(StartedBlockInt)
 	//add to sum amount of vote token to this candidate
 	key := db.GetKey(string(voteDCBBoardSumPrefix), string(StartedBlock)+string(CandidatePubKey))
@@ -62,7 +62,7 @@ func (db *db) AddVoteDCBBoard(StartedBlockInt int32, VoterPubKey []byte, Candida
 	return nil
 }
 
-func (db *db) AddVoteGOVBoard(StartedBlockInt int32, VoterPubKey []byte, CandidatePubKey []byte, amount uint64) error {
+func (db *db) AddVoteGOVBoard(StartedBlockInt uint32, VoterPubKey []byte, CandidatePubKey []byte, amount uint64) error {
 	StartedBlock := uint32(StartedBlockInt)
 	//add to sum amount of vote token to this candidate
 	key := db.GetKey(string(voteGOVBoardSumPrefix), string(StartedBlock)+string(CandidatePubKey))
@@ -112,13 +112,13 @@ func (db *db) AddVoteGOVBoard(StartedBlockInt int32, VoterPubKey []byte, Candida
 	return nil
 }
 
-func (db *db) GetTopMostVoteDCBGovernor(number uint32, StartedBlock uint32) (database.CandidateList, error) {
+func (db *db) GetTopMostVoteDCBGovernor(StartedBlock uint32) (database.CandidateList, error) {
 	var candidateList database.CandidateList
 	//use prefix  as in file lvdb/block.go FetchChain
 	prefix := db.GetKey(string(voteDCBBoardSumPrefix), string(StartedBlock))
 	iter := db.lvdb.NewIterator(util.BytesPrefix(prefix), nil)
 	for iter.Next() {
-		keyI, _ := ReverseGetKey(string(voteDCBBoardSumPrefix), iter.Key())
+		keyI, _ := db.ReverseGetKey(string(voteDCBBoardSumPrefix), iter.Key())
 		key := keyI.([]byte)
 		pubKey := key[len(string(StartedBlock)+"#"):]
 		value := binary.LittleEndian.Uint64(iter.Value())
@@ -132,13 +132,13 @@ func (db *db) GetTopMostVoteDCBGovernor(number uint32, StartedBlock uint32) (dat
 	return candidateList[len(candidateList)-blockchain.NumberOfDCBGovernors:], nil
 }
 
-func (db *db) GetTopMostVoteGOVGovernor(number uint32, StartedBlock uint32) (database.CandidateList, error) {
+func (db *db) GetTopMostVoteGOVGovernor(StartedBlock uint32) (database.CandidateList, error) {
 	var candidateList database.CandidateList
 	//use prefix  as in file lvdb/block.go FetchChain
 	prefix := db.GetKey(string(voteGOVBoardSumPrefix), string(StartedBlock))
 	iter := db.lvdb.NewIterator(util.BytesPrefix(prefix), nil)
 	for iter.Next() {
-		keyI, _ := ReverseGetKey(string(voteGOVBoardSumPrefix), iter.Key())
+		keyI, _ := db.ReverseGetKey(string(voteGOVBoardSumPrefix), iter.Key())
 		key := keyI.([]byte)
 		pubKey := key[len(string(StartedBlock)+"#"):]
 		value := binary.LittleEndian.Uint64(iter.Value())

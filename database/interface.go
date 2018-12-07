@@ -78,8 +78,8 @@ type DatabaseInterface interface {
 	LoadCrowdsaleData([]byte) (*voting.SaleData, error)
 
 	//Vote
-	AddVoteDCBBoard(uint32, string, string, uint64) error
-	AddVoteGOVBoard(uint32, string, string, uint64) error
+	AddVoteDCBBoard(uint32, []byte, []byte, uint64) error
+	AddVoteGOVBoard(uint32, []byte, []byte, uint64) error
 	GetTopMostVoteDCBGovernor(uint32) (CandidateList, error)
 	GetTopMostVoteGOVGovernor(uint32) (CandidateList, error)
 	NewIterator(*util.Range, *opt.ReadOptions) iterator.Iterator

@@ -87,6 +87,24 @@ func (tx *Tx) IsSalaryTx() bool {
 	return true
 }
 
+func (tx *Tx) GetReceiverPubKeys() [][]byte {
+	pubkeys := [][]byte{}
+	for _, desc := range tx.Descs {
+		for _, note := range desc.Note {
+			added := false
+			for _, key := range pubkeys {
+				if bytes.Equal(note.Apk[:], key) {
+					added = true
+				}
+			}
+			if !added {
+				pubkeys = append(pubkeys, note.Apk[:])
+			}
+		}
+	}
+	return pubkeys
+}
+
 func (tx *Tx) validateDoubleSpendTxWithCurrentMempool(poolNullifiers map[common.Hash][][]byte) error {
 	for _, temp1 := range poolNullifiers {
 		for _, desc := range tx.Descs {
@@ -109,7 +127,7 @@ func (tx *Tx) ValidateTxWithCurrentMempool(mr metadata.MempoolRetriever) error {
 }
 
 // ValidateDoubleSpend - check double spend for any transaction type
-func (tx *Tx) validateDoubleSpendWithBlockchain(bcr metadata.BlockchainRetriever, chainID byte) error {
+func (tx *Tx) ValidateConstDoubleSpendWithBlockchain(bcr metadata.BlockchainRetriever, chainID byte) error {
 	txHash := tx.Hash()
 	nullifierDb, err := bcr.GetNulltifiersList(chainID)
 	if err != nil {
@@ -143,7 +161,7 @@ func (tx *Tx) ValidateTxWithBlockChain(bcr metadata.BlockchainRetriever, chainID
 			return nil
 		}
 	}
-	return tx.validateDoubleSpendWithBlockchain(bcr, chainID)
+	return tx.ValidateConstDoubleSpendWithBlockchain(bcr, chainID)
 }
 
 func (tx *Tx) validateNormalTxSanityData() (bool, error) {
@@ -245,7 +263,7 @@ func (tx *Tx) validateNormalTxSanityData() (bool, error) {
 
 func (tx *Tx) ValidateSanityData(bcr metadata.BlockchainRetriever) (bool, error) {
 	if tx.Metadata != nil {
-		isContinued, ok, err := tx.Metadata.ValidateSanityData(bcr)
+		isContinued, ok, err := tx.Metadata.ValidateSanityData(bcr, tx)
 		if err != nil || !ok || !isContinued {
 			return ok, err
 		}
@@ -357,6 +375,11 @@ func (tx *Tx) GetMetadataType() int {
 // GetMetadata returns metadata of tx is existed
 func (tx *Tx) GetMetadata() metadata.Metadata {
 	return tx.Metadata
+}
+
+// SetMetadata sets metadata to tx
+func (tx *Tx) SetMetadata(meta metadata.Metadata) {
+	tx.Metadata = meta
 }
 
 // GetTxVirtualSize computes the virtual size of a given transaction

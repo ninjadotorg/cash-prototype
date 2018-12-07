@@ -8,6 +8,7 @@ import (
 )
 
 type MetadataBase struct {
+	Type int
 }
 
 func (mb *MetadataBase) Validate() error {
@@ -16,6 +17,10 @@ func (mb *MetadataBase) Validate() error {
 
 func (mb *MetadataBase) Process() error {
 	return nil
+}
+
+func (mb *MetadataBase) GetType() int {
+	return mb.Type
 }
 
 func (mb *MetadataBase) CheckTransactionFee(tr Transaction, minFee uint64) bool {
@@ -55,11 +60,16 @@ type BlockchainRetriever interface {
 	GetNulltifiersList(byte) ([][]byte, error)
 	GetCustomTokenTxs(*common.Hash) (map[common.Hash]Transaction, error)
 	GetDCBParams() params.DCBParams
-	GetDCBBoardPubKeys() []string
+	GetDCBBoardPubKeys() [][]byte
+	GetGOVParams() params.GOVParams
 	GetTransactionByHash(*common.Hash) (byte, *common.Hash, int, Transaction, error)
+
+	// For validating loan metadata
 	GetLoanTxs([]byte) ([][]byte, error)
 	GetNumberOfDCBGovernors() int
 	GetNumberOfGOVGovernors() int
+	GetLoanPayment([]byte) (uint64, uint64, uint32, error)
+	GetLoanRequestMeta([]byte) (*LoanRequest, error)
 }
 
 type Metadata interface {
@@ -67,7 +77,7 @@ type Metadata interface {
 	Hash() *common.Hash
 	CheckTransactionFee(Transaction, uint64) bool
 	ValidateTxWithBlockChain(Transaction, BlockchainRetriever, byte) (bool, error)
-	ValidateSanityData(BlockchainRetriever) (bool, bool, error)
+	ValidateSanityData(BlockchainRetriever, Transaction) (bool, bool, error)
 	ValidateMetadataByItself() bool // TODO: need to define the method for metadata
 }
 
@@ -81,6 +91,7 @@ type Transaction interface {
 	GetSenderAddrLastByte() byte
 	GetTxFee() uint64
 	GetJSPubKey() []byte
+	GetReceiverPubKeys() [][]byte
 	ListNullifiers() [][]byte
 	CheckTxVersion(int8) bool
 	CheckTransactionFee(uint64) bool
@@ -90,4 +101,6 @@ type Transaction interface {
 	ValidateSanityData(BlockchainRetriever) (bool, error)
 	ValidateTxByItself(BlockchainRetriever) bool
 	GetMetadata() Metadata
+	SetMetadata(Metadata)
+	ValidateConstDoubleSpendWithBlockchain(BlockchainRetriever, byte) error
 }

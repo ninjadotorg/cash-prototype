@@ -16,7 +16,7 @@ type ConstitutionInfo struct {
 type GOVConstitution struct {
 	ConstitutionInfo
 	CurrentGOVNationalWelfare int32
-	GOVParams                 GOVParams
+	GOVParams                 params.GOVParams
 }
 
 type DCBConstitution struct {
@@ -35,11 +35,11 @@ func (DCBConstitutionHelper) GetStartedBlockHeight(blockgen *BlkTmplGenerator, c
 }
 
 func (DCBConstitutionHelper) CheckSubmitProposalType(tx metadata.Transaction) bool {
-	return tx.GetMetadataType() == metadata.SubmitDCBProposal
+	return tx.GetMetadataType() == metadata.SubmitDCBProposalMeta
 }
 
 func (DCBConstitutionHelper) CheckVotingProposalType(tx metadata.Transaction) bool {
-	return tx.GetMetadataType() == metadata.VoteDCBProposal
+	return tx.GetMetadataType() == metadata.VoteDCBProposalMeta
 }
 
 func (DCBConstitutionHelper) GetAmountVoteToken(tx metadata.Transaction) uint64 {
@@ -53,11 +53,11 @@ func (GOVConstitutionHelper) GetStartedBlockHeight(blockgen *BlkTmplGenerator, c
 }
 
 func (GOVConstitutionHelper) CheckSubmitProposalType(tx metadata.Transaction) bool {
-	return tx.GetMetadataType() == metadata.SubmitGOVProposal
+	return tx.GetMetadataType() == metadata.SubmitGOVProposalMeta
 }
 
 func (GOVConstitutionHelper) CheckVotingProposalType(tx metadata.Transaction) bool {
-	return tx.GetMetadataType() == metadata.VoteGOVProposal
+	return tx.GetMetadataType() == metadata.VoteGOVProposalMeta
 }
 
 func (GOVConstitutionHelper) GetAmountVoteToken(tx metadata.Transaction) uint64 {

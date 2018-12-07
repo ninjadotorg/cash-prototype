@@ -8,8 +8,6 @@ import (
 	"strconv"
 	"strings"
 
-	"encoding/hex"
-
 	"github.com/ninjadotorg/constant/common"
 	"github.com/ninjadotorg/constant/privacy-protocol"
 	"github.com/ninjadotorg/constant/transaction"

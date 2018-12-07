@@ -35,9 +35,9 @@ func NewLoanResponse(data map[string]interface{}) *LoanResponse {
 	return &result
 }
 
-func (lr *LoanResponse) GetType() int {
-	return LoanResponseMeta
-}
+// func (lr *LoanResponse) GetType() int {
+// 	return LoanResponseMeta
+// }
 
 func (lr *LoanResponse) Hash() *common.Hash {
 	record := string(lr.LoanID)
@@ -82,6 +82,14 @@ func (lr *LoanResponse) ValidateTxWithBlockChain(txr Transaction, bcr Blockchain
 				if bytes.Equal(txOld.GetJSPubKey(), txr.GetJSPubKey()) {
 					return false, fmt.Errorf("Current board member already responded to loan request")
 				}
+				meta := txOld.GetMetadata()
+				if meta == nil {
+					continue
+				}
+				metaOld := meta.(*LoanResponse)
+				if lr.ValidUntil != metaOld.ValidUntil {
+					return false, fmt.Errorf("Valid deadline of all responses of a loan must be the same")
+				}
 			}
 		case LoanRequestMeta:
 			{
@@ -100,12 +108,15 @@ func (lr *LoanResponse) ValidateTxWithBlockChain(txr Transaction, bcr Blockchain
 	return true, nil
 }
 
-func (lr *LoanResponse) ValidateSanityData() (bool, bool, error) {
-	return false, false, nil
+func (lr *LoanResponse) ValidateSanityData(bcr BlockchainRetriever, txr Transaction) (bool, bool, error) {
+	if lr.Response != Accept && lr.Response != Reject {
+		return false, false, nil
+	}
+	return false, true, nil // No need to check for fee
 }
 
 func (lr *LoanResponse) ValidateMetadataByItself() bool {
-	return false
+	return true
 }
 
 // CheckTransactionFee returns true since loan response tx doesn't have fee

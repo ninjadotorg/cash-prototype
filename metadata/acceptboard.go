@@ -29,7 +29,7 @@ func (acceptDCBBoardMetadata *AcceptDCBBoardMetadata) ValidateTxWithBlockChain(T
 	return true, nil
 }
 
-func (acceptDCBBoardMetadata *AcceptDCBBoardMetadata) ValidateSanityData(bcr BlockchainRetriever) (bool, bool, error) {
+func (acceptDCBBoardMetadata *AcceptDCBBoardMetadata) ValidateSanityData(bcr BlockchainRetriever, tx Transaction) (bool, bool, error) {
 	if len(acceptDCBBoardMetadata.DCBBoardPubKeys) != bcr.GetNumberOfDCBGovernors() {
 		return true, false, nil
 	}
@@ -70,7 +70,7 @@ func (acceptGOVBoardMetadata *AcceptGOVBoardMetadata) ValidateTxWithBlockChain(T
 	return true, nil
 }
 
-func (acceptGOVBoardMetadata *AcceptGOVBoardMetadata) ValidateSanityData(bcr BlockchainRetriever) (bool, bool, error) {
+func (acceptGOVBoardMetadata *AcceptGOVBoardMetadata) ValidateSanityData(bcr BlockchainRetriever, tx Transaction) (bool, bool, error) {
 	if len(acceptGOVBoardMetadata.GOVBoardPubKeys) != bcr.GetNumberOfGOVGovernors() {
 		return true, false, nil
 	}

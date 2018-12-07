@@ -16,7 +16,6 @@ import (
 	"github.com/ninjadotorg/constant/privacy-protocol"
 	"github.com/ninjadotorg/constant/transaction"
 	"github.com/ninjadotorg/constant/wallet"
-	"golang.org/x/crypto/sha3"
 )
 
 /*
@@ -71,99 +70,6 @@ func (self *BlockChain) ValidateDoubleSpend(tx metadata.Transaction, chainID byt
 				return err
 			}
 		}
-	}
-	return nil
-}
-
-func (self *BlockChain) ValidateTxLoanPayment(tx metadata.Transaction, chainID byte) error {
-	txPayment, ok := tx.(*transaction.TxLoanPayment)
-	if !ok {
-		return fmt.Errorf("Fail parsing LoanPayment transaction")
-	}
-
-	// Check if a loan request with the same id exists on any chain
-	_, err := self.config.DataBase.GetLoanTxs(txPayment.LoanID)
-	if err != nil {
-		return err
-	}
-
-	// Check if payment amount is correct
-	requestMeta, err := self.getLoanRequestMeta(txPayment.LoanID)
-	if err != nil {
-		return err
-	}
-	_, _, deadline, err := self.config.DataBase.GetLoanPayment(txPayment.LoanID)
-	if err != nil {
-		return err
-	}
-	if txPayment.PayPrinciple && uint32(self.BestState[chainID].Height)+requestMeta.Params.Maturity >= deadline {
-		return fmt.Errorf("Interest must be fully paid before paying principle")
-	}
-	return nil
-}
-
-func (self *BlockChain) ValidateTxLoanWithdraw(tx metadata.Transaction, chainID byte) error {
-	txWithdraw, ok := tx.(*transaction.TxLoanWithdraw)
-	if !ok {
-		return fmt.Errorf("Fail parsing LoanResponse transaction")
-	}
-
-	// Check if a loan response with the same id exists on any chain
-	txHashes, err := self.config.DataBase.GetLoanTxs(txWithdraw.LoanID)
-	if err != nil {
-		return err
-	}
-	foundResponse := 0
-	keyCorrect := false
-	for _, txHash := range txHashes {
-		hash := &common.Hash{}
-		copy(hash[:], txHash)
-		_, _, _, txOld, err := self.GetTransactionByHash(hash)
-		if txOld == nil || err != nil {
-			return fmt.Errorf("Error finding corresponding loan request")
-		}
-		switch txOld.GetMetadataType() {
-		case metadata.LoanRequestMeta:
-			{
-				// Check if key is correct
-				meta := tx.GetMetadata()
-				if meta == nil {
-					return fmt.Errorf("Loan request metadata of tx loan withdraw is nil")
-				}
-				requestMeta, ok := meta.(*metadata.LoanRequest)
-				if !ok {
-					return fmt.Errorf("Error parsing loan request of tx loan withdraw")
-				}
-				h := make([]byte, 32)
-				sha3.ShakeSum256(h, txWithdraw.Key)
-				if bytes.Equal(h, requestMeta.KeyDigest) {
-					keyCorrect = true
-				}
-			}
-		case metadata.LoanResponseMeta:
-			{
-				// Check if loan is accepted
-				meta := tx.GetMetadata()
-				if meta == nil {
-					continue
-				}
-				responseMeta, ok := meta.(*metadata.LoanResponse)
-				if !ok {
-					continue
-				}
-				if responseMeta.Response == metadata.Accept {
-					foundResponse += 1
-				}
-			}
-		}
-	}
-
-	minResponse := self.BestState[chainID].BestBlock.Header.DCBConstitution.DCBParams.MinLoanResponseRequire
-	if foundResponse < int(minResponse) {
-		return fmt.Errorf("Not enough loan accepted response")
-	}
-	if !keyCorrect {
-		return fmt.Errorf("Provided key is incorrect")
 	}
 	return nil
 }
@@ -285,7 +191,7 @@ func isAllBoardAddressesInVins(
 
 func verifySignatures(
 	tx *transaction.TxCustomToken,
-	boardPubKeys []string,
+	boardPubKeys [][]byte,
 ) bool {
 	boardLen := len(boardPubKeys)
 	if boardLen == 0 {
@@ -297,11 +203,11 @@ func verifySignatures(
 	tx.BoardSigns = nil
 
 	for _, pubKey := range boardPubKeys {
-		sign, ok := signs[pubKey]
+		sign, ok := signs[string(pubKey)]
 		if !ok {
 			continue
 		}
-		keyObj, err := wallet.Base58CheckDeserialize(pubKey)
+		keyObj, err := wallet.Base58CheckDeserialize(string(pubKey))
 		if err != nil {
 			Logger.log.Info(err)
 			continue
@@ -327,7 +233,7 @@ func (bc *BlockChain) verifyByBoard(
 	customToken *transaction.TxCustomToken,
 ) bool {
 	var address string
-	var pubKeys []string
+	var pubKeys [][]byte
 	if boardType == common.DCB {
 		address = string(common.DCBAddress)
 		pubKeys = bc.BestState[0].BestBlock.Header.DCBGovernor.DCBBoardPubKeys

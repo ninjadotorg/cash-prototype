@@ -13,11 +13,6 @@ const (
 	TxCustomTokenType        = "t" // token  tx with no supporting privacy
 	TxCustomTokenPrivacyType = "t" // token  tx with supporting privacy
 
-	TxLoanResponse = "ls" // DCB accept/reject a loan request
-	TxLoanPayment  = "lp" // user makes payment of a loan
-	TxLoanWithdraw = "lw" // user provides key to withdraw locked constant
-	TxLoanUnlock   = "lu" // DCB unlock the constant and send to user as coinbase tx
-
 	TxDividendPayout     = "td"
 	TxBuyFromGOVRequest  = "bgr"
 	TxBuySellDCBRequest  = "bsdr"

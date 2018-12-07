@@ -57,9 +57,9 @@ func NewLoanRequest(data map[string]interface{}) *LoanRequest {
 	return &result
 }
 
-func (lr *LoanRequest) GetType() int {
-	return LoanRequestMeta
-}
+// func (lr *LoanRequest) GetType() int {
+// 	return LoanRequestMeta
+// }
 
 func (lr *LoanRequest) Hash() *common.Hash {
 	record := string(lr.LoanID)
@@ -102,8 +102,11 @@ func (lr *LoanRequest) ValidateTxWithBlockChain(txr Transaction, bcr BlockchainR
 	return true, nil
 }
 
-func (lr *LoanRequest) ValidateSanityData() (bool, bool, error) {
-	return true, true, nil
+func (lr *LoanRequest) ValidateSanityData(bcr BlockchainRetriever, txr Transaction) (bool, bool, error) {
+	if len(lr.KeyDigest) != LoanKeyDigestLength {
+		return false, false, nil
+	}
+	return true, true, nil // continue to check for fee
 }
 
 func (lr *LoanRequest) ValidateMetadataByItself() bool {
