@@ -1,4 +1,4 @@
-package metadata
+package voting
 
 import "github.com/ninjadotorg/constant/common"
 

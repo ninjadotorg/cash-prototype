@@ -1,7 +1,7 @@
 package params
 
 import (
-	"github.com/ninjadotorg/constant/metadata"
+	"github.com/ninjadotorg/constant/voting"
 )
 
 type LoanParams struct {
@@ -11,7 +11,7 @@ type LoanParams struct {
 }
 
 type DCBParams struct {
-	SaleData               *metadata.SaleData
+	SaleData               *voting.SaleData
 	MinLoanResponseRequire uint8
 	LoanParams             []LoanParams // params for collateralized loans of Constant
 }

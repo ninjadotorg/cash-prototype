@@ -8,6 +8,7 @@ import (
 	"github.com/ninjadotorg/constant/metadata"
 	"github.com/ninjadotorg/constant/rpcserver/jsonresult"
 	"github.com/ninjadotorg/constant/transaction"
+	"github.com/ninjadotorg/constant/voting"
 	"github.com/ninjadotorg/constant/wire"
 )
 
@@ -18,8 +19,8 @@ func (self RpcServer) buildRawSubmitDCBProposalTransaction(
 	arrayParams := common.InterfaceSlice(params)
 	DCBProposalRaw := arrayParams[len(arrayParams)-1].(map[string]interface{})
 	tx.Metadata = &metadata.SubmitDCBProposalMetadata{
-		DCBVotingParams: metadata.DCBVotingParams{
-			SaleData: &metadata.SaleData{
+		DCBVotingParams: voting.DCBVotingParams{
+			SaleData: &voting.SaleData{
 				SaleID:       []byte(DCBProposalRaw["SaleID"].(string)),
 				BuyingAsset:  []byte(DCBProposalRaw["BuyingAsset"].(string)),
 				SellingAsset: []byte(DCBProposalRaw["SellingAsset"].(string)),
@@ -40,11 +41,11 @@ func (self RpcServer) buildRawSubmitGOVProposalTransaction(
 	arrayParams := common.InterfaceSlice(params)
 	GOVProposalRaw := arrayParams[len(arrayParams)-1].(map[string]interface{})
 	tx.Metadata = &metadata.SubmitGOVProposalMetadata{
-		GOVVotingParams: metadata.GOVVotingParams{
+		GOVVotingParams: voting.GOVVotingParams{
 			SalaryPerTx: uint64(GOVProposalRaw["SalaryPerTx"].(float64)),
 			BasicSalary: uint64(GOVProposalRaw["BasicSalary"].(float64)),
 			TxFee:       uint64(GOVProposalRaw["TxFee"].(float64)),
-			SellingBonds: &metadata.SellingBonds{
+			SellingBonds: &voting.SellingBonds{
 				BondsToSell:    uint64(GOVProposalRaw["BondsToSell"].(float64)),
 				BondPrice:      uint64(GOVProposalRaw["BondPrice"].(float64)),
 				Maturity:       uint32(GOVProposalRaw["Maturity"].(float64)),
@@ -52,7 +53,7 @@ func (self RpcServer) buildRawSubmitGOVProposalTransaction(
 				StartSellingAt: uint32(GOVProposalRaw["StartSellingAt"].(float64)),
 				SellingWithin:  uint32(GOVProposalRaw["SellingWithin"].(float64)),
 			},
-			RefundInfo: &metadata.RefundInfo{
+			RefundInfo: &voting.RefundInfo{
 				ThresholdToLargeTx: uint64(GOVProposalRaw["ThresholdToLargeTx"].(float64)),
 				RefundAmount:       uint64(GOVProposalRaw["RefundAmount"].(float64)),
 			},

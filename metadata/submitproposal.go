@@ -1,9 +1,12 @@
 package metadata
 
-import "github.com/ninjadotorg/constant/common"
+import (
+	"github.com/ninjadotorg/constant/common"
+	"github.com/ninjadotorg/constant/voting"
+)
 
 type SubmitDCBProposalMetadata struct {
-	DCBVotingParams DCBVotingParams
+	DCBVotingParams voting.DCBVotingParams
 	ExecuteDuration int32
 	Explanation     string
 
@@ -45,7 +48,7 @@ func (submitDCBProposalMetadata *SubmitDCBProposalMetadata) ValidateMetadataByIt
 }
 
 type SubmitGOVProposalMetadata struct {
-	GOVVotingParams GOVVotingParams
+	GOVVotingParams voting.GOVVotingParams
 	ExecuteDuration int32
 	Explaination    string
 
