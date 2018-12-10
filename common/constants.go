@@ -39,8 +39,15 @@ const (
 	MaxBlockTime          = 10 //second Maximum for a chain to grow
 
 	// voting
-	SumOfVoteDCBToken = 100000000
-	SumOfVoteGOVToken = 100000000
+)
+
+// for voting parameter
+const (
+	SumOfVoteDCBToken                 = 100000000
+	SumOfVoteGOVToken                 = 100000000
+	MinimumBlockOfProposalDuration    = 50
+	MaximumBlockOfProposalDuration    = 200
+	MaximumProposalExplainationLength = 1000
 )
 
 // board types
