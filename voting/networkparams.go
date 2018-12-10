@@ -77,6 +77,6 @@ func (DCBVotingParams DCBVotingParams) ValidateSanityData() bool {
 }
 
 func (GOVVotingParams GOVVotingParams) ValidateSanityData() bool {
-	// Todo: @Duc Dinh
+	// Todo: @0xankylosaurus
 	return true
 }
