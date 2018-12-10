@@ -24,7 +24,6 @@ func (self RpcServer) buildRawSubmitDCBProposalTransaction(
 				SaleID:       []byte(DCBProposalRaw["SaleID"].(string)),
 				BuyingAsset:  []byte(DCBProposalRaw["BuyingAsset"].(string)),
 				SellingAsset: []byte(DCBProposalRaw["SellingAsset"].(string)),
-				Price:        uint64(DCBProposalRaw["Price"].(float64)),
 				EndBlock:     int32(DCBProposalRaw["EndBlock"].(float64)),
 			},
 		},

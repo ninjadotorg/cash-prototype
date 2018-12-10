@@ -31,13 +31,10 @@ func NewLoanResponse(data map[string]interface{}) *LoanResponse {
 	result.LoanID = s
 
 	result.Response = ValidLoanResponse(int(data["Response"].(float64)))
+	result.Type = LoanResponseMeta
 
 	return &result
 }
-
-// func (lr *LoanResponse) GetType() int {
-// 	return LoanResponseMeta
-// }
 
 func (lr *LoanResponse) Hash() *common.Hash {
 	record := string(lr.LoanID)

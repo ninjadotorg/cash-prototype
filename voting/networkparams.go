@@ -25,7 +25,6 @@ type SaleData struct {
 
 	BuyingAsset  []byte
 	SellingAsset []byte
-	Price        uint64
 	EndBlock     int32
 }
 
