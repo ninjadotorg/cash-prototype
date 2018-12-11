@@ -101,7 +101,7 @@ func (self *BlockChain) ConnectBlock(block *Block) error {
 			return NewBlockChainError(UnExpectedError, err)
 		}
 	}
-	// TODO: @0xankylosaurus optimize for loop once instead of multiple times
+	// TODO: @0xankylosaurus optimize for loop once instead of multiple times ; metadata.process
 	// save index of block
 	err := self.StoreBlockIndex(block)
 	if err != nil {
@@ -132,7 +132,7 @@ func (self *BlockChain) ConnectBlock(block *Block) error {
 		return NewBlockChainError(UnExpectedError, err)
 	}
 
-	err = self.UpdateVoteCountBoard(block)
+	err = self.UpdateVoteTokenHolder(block)
 	//Update database for vote board
 	if err != nil {
 		return NewBlockChainError(UnExpectedError, err)

@@ -86,6 +86,9 @@ type DatabaseInterface interface {
 	GetKey(string, interface{}) []byte
 	GetVoteDCBBoardListPrefix() []byte
 	GetVoteGOVBoardListPrefix() []byte
+	SendInitDCBVoteToken(uint32, []byte, uint64) error
+	SendInitGOVVoteToken(uint32, []byte, uint64) error
+
 	ReverseGetKey(string, []byte) (interface{}, error)
 
 	Close() error

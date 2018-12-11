@@ -703,6 +703,31 @@ func (self *BlockChain) UpdateVoteCountBoard(block *Block) error {
 	return nil
 }
 
+func (self *BlockChain) UpdateVoteTokenHolder(block *Block) error {
+	for _, tx := range block.Transactions {
+		switch tx.GetMetadataType() {
+		case metadata.SendInitDCBVoteTokenMeta:
+			{
+				meta := tx.GetMetadata().(*metadata.SendInitDCBVoteTokenMetadata)
+				err := self.config.DataBase.SendInitDCBVoteToken(uint32(block.Header.Height), meta.ReceiverPubKey, meta.Amount)
+				if err != nil {
+					return err
+				}
+			}
+		case metadata.SendInitGOVVoteTokenMeta:
+			{
+				meta := tx.GetMetadata().(*metadata.SendInitDCBVoteTokenMetadata)
+				err := self.config.DataBase.SendInitDCBVoteToken(uint32(block.Header.Height), meta.ReceiverPubKey, meta.Amount)
+				if err != nil {
+					return err
+				}
+			}
+
+		}
+	}
+	return nil
+}
+
 func (self *BlockChain) ProcessCrowdsaleTxs(block *Block) error {
 	for _, tx := range block.Transactions {
 		switch tx.GetMetadataType() {

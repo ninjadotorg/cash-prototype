@@ -41,12 +41,14 @@ var (
 	unspent                   = []byte("unspent")
 
 	//vote prefix
-	voteDCBBoardSumPrefix   = []byte("votedcbsumboard-")
-	voteGOVBoardSumPrefix   = []byte("votegovsumboard-")
-	voteDCBBoardCountPrefix = []byte("votedcbcountboard-")
-	voteGOVBoardCountPrefix = []byte("votegovcountboard-")
-	VoteDCBBoardListPrefix  = []byte("votedcblistboard-")
-	VoteGOVBoardListPrefix  = []byte("votegovlistboard-")
+	voteDCBBoardSumPrefix    = []byte("votedcbsumboard-")
+	voteGOVBoardSumPrefix    = []byte("votegovsumboard-")
+	voteDCBBoardCountPrefix  = []byte("votedcbcountboard-")
+	voteGOVBoardCountPrefix  = []byte("votegovcountboard-")
+	VoteDCBBoardListPrefix   = []byte("votedcblistboard-")
+	VoteGOVBoardListPrefix   = []byte("votegovlistboard-")
+	DCBVoteTokenAmountPrefix = []byte("dcbvotetokenamount-")
+	GOVVoteTokenAmountPrefix = []byte("govvotetokenamount-")
 )
 
 func open(dbPath string) (database.DatabaseInterface, error) {
@@ -111,6 +113,12 @@ func (db db) GetKey(keyType string, key interface{}) []byte {
 	case string(VoteGOVBoardListPrefix):
 		postfix := []byte(key.(string))
 		dbkey = append(VoteGOVBoardListPrefix, postfix...)
+	case string(DCBVoteTokenAmountPrefix):
+		postfix := []byte(key.(string))
+		dbkey = append(DCBVoteTokenAmountPrefix, postfix...)
+	case string(GOVVoteTokenAmountPrefix):
+		postfix := []byte(key.(string))
+		dbkey = append(GOVVoteTokenAmountPrefix, postfix...)
 	}
 	return dbkey
 }

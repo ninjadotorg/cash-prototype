@@ -13,8 +13,24 @@ type SubmitDCBProposalMetadata struct {
 	MetadataBase
 }
 
-func (*SubmitDCBProposalMetadata) GetType() int {
-	return SubmitDCBProposalMeta
+//calling from rpc function
+func NewSubmitDCBProposalMetadataFromJson(jsonData map[string]interface{}) *SubmitDCBProposalMetadata {
+	submitDCBProposalMetadata := SubmitDCBProposalMetadata{
+		DCBVotingParams: voting.DCBVotingParams{
+			SaleData: &voting.SaleData{
+				SaleID:       []byte(jsonData["SaleID"].(string)),
+				BuyingAsset:  []byte(jsonData["BuyingAsset"].(string)),
+				SellingAsset: []byte(jsonData["SellingAsset"].(string)),
+				EndBlock:     int32(jsonData["EndBlock"].(float64)),
+			},
+		},
+		ExecuteDuration: int32(jsonData["ExecuteDuration"].(float64)),
+		Explanation:     jsonData["Explanation"].(string),
+		MetadataBase: MetadataBase{
+			Type: SubmitDCBProposalMeta,
+		},
+	}
+	return &submitDCBProposalMetadata
 }
 
 func (submitDCBProposalMetadata *SubmitDCBProposalMetadata) Hash() *common.Hash {
@@ -53,6 +69,35 @@ type SubmitGOVProposalMetadata struct {
 	Explaination    string
 
 	MetadataBase
+}
+
+//calling from rpc function
+func NewSubmitGOVProposalMetadataFromJson(jsonData map[string]interface{}) *SubmitGOVProposalMetadata {
+	submitGOVProposalMetadata := SubmitGOVProposalMetadata{
+		GOVVotingParams: voting.GOVVotingParams{
+			SalaryPerTx: uint64(jsonData["SalaryPerTx"].(float64)),
+			BasicSalary: uint64(jsonData["BasicSalary"].(float64)),
+			TxFee:       uint64(jsonData["TxFee"].(float64)),
+			SellingBonds: &voting.SellingBonds{
+				BondsToSell:    uint64(jsonData["BondsToSell"].(float64)),
+				BondPrice:      uint64(jsonData["BondPrice"].(float64)),
+				Maturity:       uint32(jsonData["Maturity"].(float64)),
+				BuyBackPrice:   uint64(jsonData["BuyBackPrice"].(float64)),
+				StartSellingAt: uint32(jsonData["StartSellingAt"].(float64)),
+				SellingWithin:  uint32(jsonData["SellingWithin"].(float64)),
+			},
+			RefundInfo: &voting.RefundInfo{
+				ThresholdToLargeTx: uint64(jsonData["ThresholdToLargeTx"].(float64)),
+				RefundAmount:       uint64(jsonData["RefundAmount"].(float64)),
+			},
+		},
+		ExecuteDuration: int32(jsonData["ExecuteDuration"].(float64)),
+		Explaination:    string(jsonData["Explaination"].(string)),
+		MetadataBase: MetadataBase{
+			Type: SubmitGOVProposalMeta,
+		},
+	}
+	return &submitGOVProposalMetadata
 }
 
 func (submitGOVProposalMetadata *SubmitGOVProposalMetadata) Hash() *common.Hash {
