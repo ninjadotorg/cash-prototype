@@ -76,6 +76,10 @@ func (self *BlockChain) GetDCBBoardPubKeys() [][]byte {
 	return self.BestState[0].BestBlock.Header.DCBGovernor.DCBBoardPubKeys
 }
 
+func (self *BlockChain) GetGOVBoardPubKeys() [][]byte {
+	return self.BestState[0].BestBlock.Header.GOVGovernor.GOVBoardPubKeys
+}
+
 func (self *BlockChain) GetDCBParams() params.DCBParams {
 	return self.BestState[0].BestBlock.Header.DCBConstitution.DCBParams
 }

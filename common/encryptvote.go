@@ -1,6 +1,6 @@
 package common
 
-// todo @0xjackalope
+// todo @0xjackalope; need to strictly specific data type to catch all used position
 func Encrypt(data interface{}, pubKey interface{}) interface{} {
 	return nil
 }
