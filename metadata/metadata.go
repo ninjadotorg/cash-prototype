@@ -1,10 +1,12 @@
 package metadata
 
 import (
+	"strconv"
 	"time"
 
 	"github.com/ninjadotorg/constant/blockchain/params"
 	"github.com/ninjadotorg/constant/common"
+	"github.com/ninjadotorg/constant/database"
 	"github.com/ninjadotorg/constant/voting"
 )
 
@@ -22,6 +24,12 @@ func (mb *MetadataBase) Process() error {
 
 func (mb *MetadataBase) GetType() int {
 	return mb.Type
+}
+
+func (mb *MetadataBase) Hash() *common.Hash {
+	record := strconv.Itoa(mb.Type)
+	hash := common.DoubleHashH([]byte(record))
+	return &hash
 }
 
 func (mb *MetadataBase) CheckTransactionFee(tr Transaction, minFee uint64) bool {
@@ -93,7 +101,7 @@ type Metadata interface {
 // Interface for all type of transaction
 type Transaction interface {
 	Hash() *common.Hash
-	ValidateTransaction() bool
+	ValidateTransaction(bool, database.DatabaseInterface) bool
 	GetMetadataType() int
 	GetType() string
 	GetTxVirtualSize() uint64
@@ -106,11 +114,12 @@ type Transaction interface {
 	ValidateTxWithCurrentMempool(MempoolRetriever) error
 	ValidateTxWithBlockChain(BlockchainRetriever, byte) error
 	ValidateSanityData(BlockchainRetriever) (bool, error)
-	ValidateTxByItself(BlockchainRetriever) bool
+	ValidateTxByItself(bool, database.DatabaseInterface, BlockchainRetriever) bool
 	GetMetadata() Metadata
 	SetMetadata(Metadata)
 	ValidateConstDoubleSpendWithBlockchain(BlockchainRetriever, byte) error
 
 	GetJSPubKey() []byte
 	GetReceivers() ([][]byte, []uint64)
+	IsPrivacy() bool
 }
