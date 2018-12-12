@@ -64,6 +64,7 @@ func (sealGOVBallotMetadata *SealedGOVBallotMetadata) ValidateMetadataByItself()
 type SealedLv1GOVBallotMetadata struct {
 	SealedGOVBallotMetadata
 	PointerToLv2Ballot *common.Hash
+	PointerToLv3Ballot *common.Hash
 }
 
 func NewSealedLv1GOVBallotMetadata(data map[string]interface{}) *SealedLv1GOVBallotMetadata {
@@ -76,12 +77,14 @@ func NewSealedLv1GOVBallotMetadata(data map[string]interface{}) *SealedLv1GOVBal
 			},
 		},
 		PointerToLv2Ballot: data["PointerToLv2Ballot"].(*common.Hash),
+		PointerToLv3Ballot: data["PointerToLv3Ballot"].(*common.Hash),
 	}
 }
 
 func (sealedLv1GOVBallotMetadata *SealedLv1GOVBallotMetadata) Hash() *common.Hash {
 	record := string(common.ToBytes(sealedLv1GOVBallotMetadata.SealedGOVBallotMetadata.Hash()))
 	record += string(common.ToBytes(sealedLv1GOVBallotMetadata.PointerToLv2Ballot))
+	record += string(common.ToBytes(sealedLv1GOVBallotMetadata.PointerToLv3Ballot))
 	hash := common.DoubleHashH([]byte(record))
 	return &hash
 }
@@ -96,6 +99,10 @@ func (sealedLv1GOVBallotMetadata *SealedLv1GOVBallotMetadata) ValidateTxWithBloc
 	//Check precede transaction type
 	_, _, _, lv2Tx, _ := bcr.GetTransactionByHash(sealedLv1GOVBallotMetadata.PointerToLv2Ballot)
 	if lv2Tx.GetMetadataType() != SealedLv2GOVBallotMeta {
+		return false, nil
+	}
+	_, _, _, lv3Tx, _ := bcr.GetTransactionByHash(sealedLv1GOVBallotMetadata.PointerToLv3Ballot)
+	if lv3Tx.GetMetadataType() != SealedLv3GOVBallotMeta {
 		return false, nil
 	}
 
@@ -187,6 +194,7 @@ type NormalGOVBallotFromSealerMetadata struct {
 	Ballot             []byte
 	LockerPubKey       [][]byte
 	PointerToLv1Ballot *common.Hash
+	PointerToLv3Ballot *common.Hash
 	MetadataBase
 }
 
@@ -217,6 +225,7 @@ func NewNormalGOVBallotFromSealerMetadata(data map[string]interface{}) *NormalGO
 		Ballot:             data["Ballot"].([]byte),
 		LockerPubKey:       data["LockerPubKey"].([][]byte),
 		PointerToLv1Ballot: data["PointerToLv1Ballot"].(*common.Hash),
+		PointerToLv3Ballot: data["PointerToLv3Ballot"].(*common.Hash),
 		MetadataBase: MetadataBase{
 			Type: NormalGOVBallotMetaFromSealer,
 		},
@@ -229,6 +238,7 @@ func (normalGOVBallotFromSealerMetadata *NormalGOVBallotFromSealerMetadata) Hash
 		record += string(i)
 	}
 	record += string(common.ToBytes(normalGOVBallotFromSealerMetadata.PointerToLv1Ballot))
+	record += string(common.ToBytes(normalGOVBallotFromSealerMetadata.PointerToLv3Ballot))
 	hash := common.DoubleHashH([]byte(record))
 	return &hash
 }
@@ -252,6 +262,10 @@ func (normalGOVBallotFromSealerMetadata *NormalGOVBallotFromSealerMetadata) Vali
 	//Check precede transaction type
 	_, _, _, lv1Tx, _ := bcr.GetTransactionByHash(normalGOVBallotFromSealerMetadata.PointerToLv1Ballot)
 	if lv1Tx.GetMetadataType() != SealedLv1GOVBallotMeta {
+		return false, nil
+	}
+	_, _, _, lv3Tx, _ := bcr.GetTransactionByHash(normalGOVBallotFromSealerMetadata.PointerToLv3Ballot)
+	if lv3Tx.GetMetadataType() != SealedLv3GOVBallotMeta {
 		return false, nil
 	}
 

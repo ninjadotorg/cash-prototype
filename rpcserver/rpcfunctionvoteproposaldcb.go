@@ -129,9 +129,15 @@ func (self RpcServer) buildRawSealLv1VoteDCBProposalTransaction(
 ) (*transaction.Tx, error) {
 	tx, err := self.buildRawTransaction(params)
 	arrayParams := common.InterfaceSlice(params)
+
+	PointerToLv3Ballot := arrayParams[len(arrayParams)-7]
+	Pointer3 := common.Hash{}
+	copy(Pointer3[:], []byte(PointerToLv3Ballot.(string)))
+
 	PointerToLv2Ballot := arrayParams[len(arrayParams)-6]
-	Pointer := common.Hash{}
-	copy(Pointer[:], []byte(PointerToLv2Ballot.(string)))
+	Pointer2 := common.Hash{}
+	copy(Pointer2[:], []byte(PointerToLv2Ballot.(string)))
+
 	Seal2Data := arrayParams[len(arrayParams)-5]
 	firstPubKey := arrayParams[len(arrayParams)-4]
 	secondPubKey := arrayParams[len(arrayParams)-3]
@@ -142,7 +148,8 @@ func (self RpcServer) buildRawSealLv1VoteDCBProposalTransaction(
 		map[string]interface{}{
 			"SealedBallot":       []byte(Seal1Data.(string)),
 			"LockerPubKey":       [][]byte{[]byte(firstPubKey.(string)), []byte(secondPubKey.(string)), []byte(thirdPubKey.(string))},
-			"PointerToLv2Ballot": &Pointer,
+			"PointerToLv2Ballot": &Pointer2,
+			"PointerToLv3Ballot": &Pointer3,
 		})
 	return tx, err
 }
@@ -187,9 +194,14 @@ func (self RpcServer) buildRawNormalVoteDCBProposalTransactionFromSealer(
 ) (*transaction.Tx, error) {
 	tx, err := self.buildRawTransaction(params)
 	arrayParams := common.InterfaceSlice(params)
+
+	PointerToLv3Ballot := arrayParams[len(arrayParams)-7]
+	Pointer3 := common.Hash{}
+	copy(Pointer3[:], []byte(PointerToLv3Ballot.(string)))
+
 	PointerToLv1Ballot := arrayParams[len(arrayParams)-6]
-	Pointer := common.Hash{}
-	copy(Pointer[:], []byte(PointerToLv1Ballot.(string)))
+	Pointer1 := common.Hash{}
+	copy(Pointer1[:], []byte(PointerToLv1Ballot.(string)))
 
 	Seal1Data := arrayParams[len(arrayParams)-5]
 	firstPubKey := arrayParams[len(arrayParams)-4]
@@ -201,7 +213,8 @@ func (self RpcServer) buildRawNormalVoteDCBProposalTransactionFromSealer(
 		map[string]interface{}{
 			"Ballot":             normalBallot.([]byte),
 			"LockerPubKey":       [][]byte{firstPubKey.([]byte), secondPubKey.([]byte), thirdPubKey.([]byte)},
-			"PointerToLv1Ballot": &Pointer,
+			"PointerToLv1Ballot": &Pointer1,
+			"PointerToLv3Ballot": &Pointer3,
 		})
 	return tx, err
 }
