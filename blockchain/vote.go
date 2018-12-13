@@ -22,7 +22,7 @@ func (blockgen *BlkTmplGenerator) createAcceptConstitutionTx(
 	// count vote from lastConstitution.StartedBlockHeight to Bestblock height
 	CountVote := make(map[common.Hash]int64)
 	Transaction := make(map[common.Hash]*metadata.Transaction)
-	for blockHeight := ConstitutionHelper.GetStartedBlockHeight(blockgen, chainID); blockHeight < BestBlock.Header.Height; blockHeight += 1 {
+	for blockHeight := ConstitutionHelper.GetStartedNormalVote(blockgen, chainID); blockHeight <= BestBlock.Header.Height; blockHeight++ {
 		//retrieve block from block's height
 		hashBlock, err := blockgen.chain.config.DataBase.GetBlockByIndex(blockHeight, chainID)
 		if err != nil {

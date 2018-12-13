@@ -755,6 +755,33 @@ func (self *BlockChain) UpdateVoteTokenHolder(block *Block) error {
 	return nil
 }
 
+func (self *BlockChain) ProcessVoteProposal(block *Block) error {
+	nextDCBConstitutionBlockHeight := uint32(block.Header.DCBConstitution.GetEndedBlockHeight())
+	for _, tx := range block.Transactions {
+		meta := tx.GetMetadata()
+		switch tx.GetMetadataType() {
+		case metadata.SealedLv3DCBBallotMeta:
+			underlieMetadata := meta.(*metadata.SealedLv3DCBBallotMetadata)
+			self.config.DataBase.AddVoteLv3Proposal("dcb", nextDCBConstitutionBlockHeight, underlieMetadata.Hash())
+		case metadata.SealedLv2DCBBallotMeta:
+			underlieMetadata := meta.(*metadata.SealedLv2DCBBallotMetadata)
+			self.config.DataBase.AddVoteLv1or2Proposal("dcb", nextDCBConstitutionBlockHeight, underlieMetadata.PointerToLv3Ballot)
+		case metadata.SealedLv1DCBBallotMeta:
+			underlieMetadata := meta.(*metadata.SealedLv1DCBBallotMetadata)
+			self.config.DataBase.AddVoteLv1or2Proposal("dcb", nextDCBConstitutionBlockHeight, underlieMetadata.PointerToLv3Ballot)
+		case metadata.NormalDCBBallotMetaFromOwner:
+			underlieMetadata := meta.(*metadata.NormalDCBBallotFromOwnerMetadata)
+			self.config.DataBase.AddVoteNormalProposalFromOwner("dcb", nextDCBConstitutionBlockHeight, underlieMetadata.PointerToLv3Ballot)
+		case metadata.NormalDCBBallotMetaFromSealer:
+			underlieMetadata := meta.(*metadata.NormalDCBBallotFromSealerMetadata)
+			self.config.DataBase.AddVoteNormalProposalFromSealer("dcb", nextDCBConstitutionBlockHeight, underlieMetadata.PointerToLv3Ballot)
+			// todo: gov
+
+		}
+	}
+	return nil
+}
+
 func (self *BlockChain) ProcessCrowdsaleTxs(block *Block) error {
 	// for _, tx := range block.Transactions {
 	// 	switch tx.GetMetadataType() {
