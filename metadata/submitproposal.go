@@ -3,6 +3,7 @@ package metadata
 import (
 	"github.com/ninjadotorg/constant/blockchain/params"
 	"github.com/ninjadotorg/constant/common"
+	"github.com/ninjadotorg/constant/database"
 	"github.com/ninjadotorg/constant/voting"
 )
 
@@ -47,14 +48,14 @@ func NewSubmitDCBProposalMetadataFromJson(jsonData map[string]interface{}) *Subm
 }
 
 func (submitDCBProposalMetadata *SubmitDCBProposalMetadata) Hash() *common.Hash {
-	record := string(common.ToBytes(submitDCBProposalMetadata.DCBParams.Hash()))
+	record := string(common.ToBytes(*submitDCBProposalMetadata.DCBParams.Hash()))
 	record += string(submitDCBProposalMetadata.ExecuteDuration)
 	record += submitDCBProposalMetadata.Explanation
 	hash := common.DoubleHashH([]byte(record))
 	return &hash
 }
 
-func (submitDCBProposalMetadata *SubmitDCBProposalMetadata) ValidateTxWithBlockChain(Transaction, BlockchainRetriever, byte) (bool, error) {
+func (submitDCBProposalMetadata *SubmitDCBProposalMetadata) ValidateTxWithBlockChain(Transaction, BlockchainRetriever, byte, database.DatabaseInterface) (bool, error) {
 	return true, nil
 }
 
@@ -114,14 +115,14 @@ func NewSubmitGOVProposalMetadataFromJson(jsonData map[string]interface{}) *Subm
 }
 
 func (submitGOVProposalMetadata *SubmitGOVProposalMetadata) Hash() *common.Hash {
-	record := string(common.ToBytes(submitGOVProposalMetadata.GOVParams.Hash()))
+	record := string(common.ToBytes(*submitGOVProposalMetadata.GOVParams.Hash()))
 	record += string(submitGOVProposalMetadata.ExecuteDuration)
 	record += submitGOVProposalMetadata.Explaination
 	hash := common.DoubleHashH([]byte(record))
 	return &hash
 }
 
-func (submitGOVProposalMetadata *SubmitGOVProposalMetadata) ValidateTxWithBlockChain(Transaction, BlockchainRetriever, byte) (bool, error) {
+func (submitGOVProposalMetadata *SubmitGOVProposalMetadata) ValidateTxWithBlockChain(Transaction, BlockchainRetriever, byte, database.DatabaseInterface) (bool, error) {
 	return true, nil
 }
 

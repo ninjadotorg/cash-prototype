@@ -27,6 +27,7 @@ var (
 	privateKeyPrefix          = []byte("prk-")
 	serialNumbersPrefix       = []byte("serinalnumbers-")
 	commitmentsPrefix         = []byte("commitments-")
+	outcoinsPrefix            = []byte("outcoins-")
 	snderivatorsPrefix        = []byte("snderivators-")
 	bestBlockKey              = []byte("bestBlock")
 	feeEstimator              = []byte("feeEstimator")
@@ -51,6 +52,7 @@ var (
 	GOVVoteTokenAmountPrefix      = []byte("govvotetokenamount-")
 	threePhraseCryptoOwnerPrefix  = []byte("threephrasecryptoownerprefix-")
 	threePhraseCryptoSealerPrefix = []byte("threephrasecryptosealerprefix-")
+	threePhraseCryptolv3Prefix    = []byte("threephrasecryptolv3prefix")
 
 	Unreward = []byte("unreward")
 	Spent    = []byte("spent")
@@ -84,6 +86,14 @@ func (db *db) Put(key, value []byte) error {
 	return nil
 }
 
+func (db *db) Delete(key []byte) error {
+	err := db.lvdb.Delete(key, nil)
+	if err != nil {
+		return database.NewDatabaseError(database.UnexpectedError, errors.Wrap(err, "db.lvdb.Delete"))
+	}
+	return nil
+}
+
 func (db *db) Get(key []byte) ([]byte, error) {
 	value, err := db.lvdb.Get(key, nil)
 	if err != nil {
@@ -104,6 +114,8 @@ func (db db) GetKey(keyType string, key interface{}) []byte {
 		dbkey = append(serialNumbersPrefix, []byte(key.(string))...)
 	case string(commitmentsPrefix):
 		dbkey = append(commitmentsPrefix, []byte(key.(string))...)
+	case string(outcoinsPrefix):
+		dbkey = append(outcoinsPrefix, []byte(key.(string))...)
 	case string(snderivatorsPrefix):
 		dbkey = append(snderivatorsPrefix, []byte(key.(string))...)
 	case string(TokenPrefix):

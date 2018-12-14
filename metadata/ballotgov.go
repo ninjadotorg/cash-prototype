@@ -2,6 +2,7 @@ package metadata
 
 import (
 	"github.com/ninjadotorg/constant/common"
+	"github.com/ninjadotorg/constant/database"
 )
 
 //abstract class
@@ -21,7 +22,7 @@ func (sealGOVBallotMetadata *SealedGOVBallotMetadata) Hash() *common.Hash {
 	return &hash
 }
 
-func (sealGOVBallotMetadata *SealedGOVBallotMetadata) ValidateTxWithBlockChain(tx Transaction, bcr BlockchainRetriever, chainID byte) (bool, error) {
+func (sealGOVBallotMetadata *SealedGOVBallotMetadata) ValidateTxWithBlockChain(tx Transaction, bcr BlockchainRetriever, chainID byte, db database.DatabaseInterface) (bool, error) {
 	//Validate these pubKeys are in board
 	govBoardPubKeys := bcr.GetGOVBoardPubKeys()
 	for _, j := range sealGOVBallotMetadata.LockerPubKey {
@@ -63,8 +64,8 @@ func (sealGOVBallotMetadata *SealedGOVBallotMetadata) ValidateMetadataByItself()
 
 type SealedLv1GOVBallotMetadata struct {
 	SealedGOVBallotMetadata
-	PointerToLv2Ballot *common.Hash
-	PointerToLv3Ballot *common.Hash
+	PointerToLv2Ballot common.Hash
+	PointerToLv3Ballot common.Hash
 }
 
 func NewSealedLv1GOVBallotMetadata(data map[string]interface{}) *SealedLv1GOVBallotMetadata {
@@ -76,32 +77,32 @@ func NewSealedLv1GOVBallotMetadata(data map[string]interface{}) *SealedLv1GOVBal
 				Type: SealedLv1GOVBallotMeta,
 			},
 		},
-		PointerToLv2Ballot: data["PointerToLv2Ballot"].(*common.Hash),
-		PointerToLv3Ballot: data["PointerToLv3Ballot"].(*common.Hash),
+		PointerToLv2Ballot: data["PointerToLv2Ballot"].(common.Hash),
+		PointerToLv3Ballot: data["PointerToLv3Ballot"].(common.Hash),
 	}
 }
 
 func (sealedLv1GOVBallotMetadata *SealedLv1GOVBallotMetadata) Hash() *common.Hash {
-	record := string(common.ToBytes(sealedLv1GOVBallotMetadata.SealedGOVBallotMetadata.Hash()))
+	record := string(common.ToBytes(*sealedLv1GOVBallotMetadata.SealedGOVBallotMetadata.Hash()))
 	record += string(common.ToBytes(sealedLv1GOVBallotMetadata.PointerToLv2Ballot))
 	record += string(common.ToBytes(sealedLv1GOVBallotMetadata.PointerToLv3Ballot))
 	hash := common.DoubleHashH([]byte(record))
 	return &hash
 }
 
-func (sealedLv1GOVBallotMetadata *SealedLv1GOVBallotMetadata) ValidateTxWithBlockChain(tx Transaction, bcr BlockchainRetriever, chainID byte) (bool, error) {
+func (sealedLv1GOVBallotMetadata *SealedLv1GOVBallotMetadata) ValidateTxWithBlockChain(tx Transaction, bcr BlockchainRetriever, chainID byte, db database.DatabaseInterface) (bool, error) {
 	//Check base seal metadata
-	ok, err := sealedLv1GOVBallotMetadata.SealedGOVBallotMetadata.ValidateTxWithBlockChain(tx, bcr, chainID)
+	ok, err := sealedLv1GOVBallotMetadata.SealedGOVBallotMetadata.ValidateTxWithBlockChain(tx, bcr, chainID, db)
 	if err != nil || !ok {
 		return ok, err
 	}
 
 	//Check precede transaction type
-	_, _, _, lv2Tx, _ := bcr.GetTransactionByHash(sealedLv1GOVBallotMetadata.PointerToLv2Ballot)
+	_, _, _, lv2Tx, _ := bcr.GetTransactionByHash(&sealedLv1GOVBallotMetadata.PointerToLv2Ballot)
 	if lv2Tx.GetMetadataType() != SealedLv2GOVBallotMeta {
 		return false, nil
 	}
-	_, _, _, lv3Tx, _ := bcr.GetTransactionByHash(sealedLv1GOVBallotMetadata.PointerToLv3Ballot)
+	_, _, _, lv3Tx, _ := bcr.GetTransactionByHash(&sealedLv1GOVBallotMetadata.PointerToLv3Ballot)
 	if lv3Tx.GetMetadataType() != SealedLv3GOVBallotMeta {
 		return false, nil
 	}
@@ -123,7 +124,7 @@ func (sealedLv1GOVBallotMetadata *SealedLv1GOVBallotMetadata) ValidateTxWithBloc
 
 type SealedLv2GOVBallotMetadata struct {
 	SealedGOVBallotMetadata
-	PointerToLv3Ballot *common.Hash
+	PointerToLv3Ballot common.Hash
 }
 
 func NewSealedLv2GOVBallotMetadata(data map[string]interface{}) *SealedLv2GOVBallotMetadata {
@@ -135,26 +136,26 @@ func NewSealedLv2GOVBallotMetadata(data map[string]interface{}) *SealedLv2GOVBal
 				Type: SealedLv2GOVBallotMeta,
 			},
 		},
-		PointerToLv3Ballot: data["PointerToLv3Ballot"].(*common.Hash),
+		PointerToLv3Ballot: data["PointerToLv3Ballot"].(common.Hash),
 	}
 }
 
 func (sealedLv2GOVBallotMetadata *SealedLv2GOVBallotMetadata) Hash() *common.Hash {
-	record := string(common.ToBytes(sealedLv2GOVBallotMetadata.SealedGOVBallotMetadata.Hash()))
+	record := string(common.ToBytes(*sealedLv2GOVBallotMetadata.SealedGOVBallotMetadata.Hash()))
 	record += string(common.ToBytes(sealedLv2GOVBallotMetadata.PointerToLv3Ballot))
 	hash := common.DoubleHashH([]byte(record))
 	return &hash
 }
 
-func (sealedLv2GOVBallotMetadata *SealedLv2GOVBallotMetadata) ValidateTxWithBlockChain(tx Transaction, bcr BlockchainRetriever, chainID byte) (bool, error) {
+func (sealedLv2GOVBallotMetadata *SealedLv2GOVBallotMetadata) ValidateTxWithBlockChain(tx Transaction, bcr BlockchainRetriever, chainID byte, db database.DatabaseInterface) (bool, error) {
 	//Check base seal metadata
-	ok, err := sealedLv2GOVBallotMetadata.SealedGOVBallotMetadata.ValidateTxWithBlockChain(tx, bcr, chainID)
+	ok, err := sealedLv2GOVBallotMetadata.SealedGOVBallotMetadata.ValidateTxWithBlockChain(tx, bcr, chainID, db)
 	if err != nil || !ok {
 		return ok, err
 	}
 
 	//Check precede transaction type
-	_, _, _, lv3Tx, _ := bcr.GetTransactionByHash(sealedLv2GOVBallotMetadata.PointerToLv3Ballot)
+	_, _, _, lv3Tx, _ := bcr.GetTransactionByHash(&sealedLv2GOVBallotMetadata.PointerToLv3Ballot)
 	if lv3Tx.GetMetadataType() != SealedLv3GOVBallotMeta {
 		return false, nil
 	}
@@ -193,8 +194,8 @@ func NewSealedLv3GOVBallotMetadata(data map[string]interface{}) *SealedLv3GOVBal
 type NormalGOVBallotFromSealerMetadata struct {
 	Ballot             []byte
 	LockerPubKey       [][]byte
-	PointerToLv1Ballot *common.Hash
-	PointerToLv3Ballot *common.Hash
+	PointerToLv1Ballot common.Hash
+	PointerToLv3Ballot common.Hash
 	MetadataBase
 }
 
@@ -224,8 +225,8 @@ func NewNormalGOVBallotFromSealerMetadata(data map[string]interface{}) *NormalGO
 	return &NormalGOVBallotFromSealerMetadata{
 		Ballot:             data["Ballot"].([]byte),
 		LockerPubKey:       data["LockerPubKey"].([][]byte),
-		PointerToLv1Ballot: data["PointerToLv1Ballot"].(*common.Hash),
-		PointerToLv3Ballot: data["PointerToLv3Ballot"].(*common.Hash),
+		PointerToLv1Ballot: data["PointerToLv1Ballot"].(common.Hash),
+		PointerToLv3Ballot: data["PointerToLv3Ballot"].(common.Hash),
 		MetadataBase: MetadataBase{
 			Type: NormalGOVBallotMetaFromSealer,
 		},
@@ -243,7 +244,7 @@ func (normalGOVBallotFromSealerMetadata *NormalGOVBallotFromSealerMetadata) Hash
 	return &hash
 }
 
-func (normalGOVBallotFromSealerMetadata *NormalGOVBallotFromSealerMetadata) ValidateTxWithBlockChain(tx Transaction, bcr BlockchainRetriever, chainID byte) (bool, error) {
+func (normalGOVBallotFromSealerMetadata *NormalGOVBallotFromSealerMetadata) ValidateTxWithBlockChain(tx Transaction, bcr BlockchainRetriever, chainID byte, db database.DatabaseInterface) (bool, error) {
 	//Validate these pubKeys are in board
 	govBoardPubKeys := bcr.GetGOVBoardPubKeys()
 	for _, j := range normalGOVBallotFromSealerMetadata.LockerPubKey {
@@ -260,11 +261,11 @@ func (normalGOVBallotFromSealerMetadata *NormalGOVBallotFromSealerMetadata) Vali
 	}
 
 	//Check precede transaction type
-	_, _, _, lv1Tx, _ := bcr.GetTransactionByHash(normalGOVBallotFromSealerMetadata.PointerToLv1Ballot)
+	_, _, _, lv1Tx, _ := bcr.GetTransactionByHash(&normalGOVBallotFromSealerMetadata.PointerToLv1Ballot)
 	if lv1Tx.GetMetadataType() != SealedLv1GOVBallotMeta {
 		return false, nil
 	}
-	_, _, _, lv3Tx, _ := bcr.GetTransactionByHash(normalGOVBallotFromSealerMetadata.PointerToLv3Ballot)
+	_, _, _, lv3Tx, _ := bcr.GetTransactionByHash(&normalGOVBallotFromSealerMetadata.PointerToLv3Ballot)
 	if lv3Tx.GetMetadataType() != SealedLv3GOVBallotMeta {
 		return false, nil
 	}
@@ -287,7 +288,7 @@ func (normalGOVBallotFromSealerMetadata *NormalGOVBallotFromSealerMetadata) Vali
 type NormalGOVBallotFromOwnerMetadata struct {
 	Ballot             []byte
 	LockerPubKey       [][]byte
-	PointerToLv3Ballot *common.Hash
+	PointerToLv3Ballot common.Hash
 	MetadataBase
 }
 
@@ -295,7 +296,7 @@ func NewNormalGOVBallotFromOwnerMetadata(data map[string]interface{}) *NormalGOV
 	return &NormalGOVBallotFromOwnerMetadata{
 		Ballot:             data["Ballot"].([]byte),
 		LockerPubKey:       data["LockerPubKey"].([][]byte),
-		PointerToLv3Ballot: data["PointerToLv3Ballot"].(*common.Hash),
+		PointerToLv3Ballot: data["PointerToLv3Ballot"].(common.Hash),
 		MetadataBase: MetadataBase{
 			Type: NormalGOVBallotMetaFromOwner,
 		},
@@ -312,7 +313,7 @@ func (normalGOVBallotFromOwnerMetadata *NormalGOVBallotFromOwnerMetadata) Hash()
 	return &hash
 }
 
-func (normalGOVBallotFromOwnerMetadata *NormalGOVBallotFromOwnerMetadata) ValidateTxWithBlockChain(tx Transaction, bcr BlockchainRetriever, chainID byte) (bool, error) {
+func (normalGOVBallotFromOwnerMetadata *NormalGOVBallotFromOwnerMetadata) ValidateTxWithBlockChain(tx Transaction, bcr BlockchainRetriever, chainID byte, db database.DatabaseInterface) (bool, error) {
 	//Validate these pubKeys are in board
 	govBoardPubKeys := bcr.GetGOVBoardPubKeys()
 	for _, j := range normalGOVBallotFromOwnerMetadata.LockerPubKey {
@@ -329,7 +330,7 @@ func (normalGOVBallotFromOwnerMetadata *NormalGOVBallotFromOwnerMetadata) Valida
 	}
 
 	//Check precede transaction type
-	_, _, _, lv3Tx, _ := bcr.GetTransactionByHash(normalGOVBallotFromOwnerMetadata.PointerToLv3Ballot)
+	_, _, _, lv3Tx, _ := bcr.GetTransactionByHash(&normalGOVBallotFromOwnerMetadata.PointerToLv3Ballot)
 	if lv3Tx.GetMetadataType() != SealedLv3GOVBallotMeta {
 		return false, nil
 	}

@@ -1,21 +1,24 @@
 package metadata
 
-import "github.com/ninjadotorg/constant/common"
+import (
+	"github.com/ninjadotorg/constant/common"
+	"github.com/ninjadotorg/constant/database"
+)
 
 type AcceptDCBProposalMetadata struct {
-	DCBProposalTXID *common.Hash
+	DCBProposalTXID common.Hash
 
 	MetadataBase
 }
 
 func NewAcceptDCBProposalMetadata(voteDCBBoardMetadata map[string]interface{}) *AcceptDCBProposalMetadata {
 	return &AcceptDCBProposalMetadata{
-		DCBProposalTXID: voteDCBBoardMetadata["DCBProposalTXID"].(*common.Hash),
+		DCBProposalTXID: voteDCBBoardMetadata["DCBProposalTXID"].(common.Hash),
 	}
 }
 
-func (acceptDCBProposalMetadata *AcceptDCBProposalMetadata) ValidateTxWithBlockChain(txr Transaction, bcr BlockchainRetriever, chainID byte) (bool, error) {
-	_, _, _, tx, err := bcr.GetTransactionByHash(acceptDCBProposalMetadata.DCBProposalTXID)
+func (acceptDCBProposalMetadata *AcceptDCBProposalMetadata) ValidateTxWithBlockChain(txr Transaction, bcr BlockchainRetriever, chainID byte, db database.DatabaseInterface) (bool, error) {
+	_, _, _, tx, err := bcr.GetTransactionByHash(&acceptDCBProposalMetadata.DCBProposalTXID)
 	if err != nil {
 		return false, err
 	}
@@ -44,19 +47,19 @@ func (acceptDCBProposalMetadata *AcceptDCBProposalMetadata) ValidateMetadataByIt
 }
 
 type AcceptGOVProposalMetadata struct {
-	GOVProposalTXID *common.Hash
+	GOVProposalTXID common.Hash
 
 	MetadataBase
 }
 
 func NewAcceptGOVProposalMetadata(voteGOVBoardMetadata map[string]interface{}) *AcceptGOVProposalMetadata {
 	return &AcceptGOVProposalMetadata{
-		GOVProposalTXID: voteGOVBoardMetadata["GOVProposalTXID"].(*common.Hash),
+		GOVProposalTXID: voteGOVBoardMetadata["GOVProposalTXID"].(common.Hash),
 	}
 }
 
-func (acceptGOVProposalMetadata *AcceptGOVProposalMetadata) ValidateTxWithBlockChain(txr Transaction, bcr BlockchainRetriever, chainID byte) (bool, error) {
-	_, _, _, tx, err := bcr.GetTransactionByHash(acceptGOVProposalMetadata.GOVProposalTXID)
+func (acceptGOVProposalMetadata *AcceptGOVProposalMetadata) ValidateTxWithBlockChain(txr Transaction, bcr BlockchainRetriever, chainID byte, db database.DatabaseInterface) (bool, error) {
+	_, _, _, tx, err := bcr.GetTransactionByHash(&acceptGOVProposalMetadata.GOVProposalTXID)
 	if err != nil {
 		return false, err
 	}

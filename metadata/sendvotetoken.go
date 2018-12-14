@@ -2,6 +2,7 @@ package metadata
 
 import (
 	"github.com/ninjadotorg/constant/common"
+	"github.com/ninjadotorg/constant/database"
 )
 
 type SendInitDCBVoteTokenMetadata struct {
@@ -29,7 +30,7 @@ func (sendInitDCBVoteTokenMetadata *SendInitDCBVoteTokenMetadata) Hash() *common
 	return &hash
 }
 
-func (sendInitDCBVoteTokenMetadata *SendInitDCBVoteTokenMetadata) ValidateTxWithBlockChain(Transaction, BlockchainRetriever, byte) (bool, error) {
+func (sendInitDCBVoteTokenMetadata *SendInitDCBVoteTokenMetadata) ValidateTxWithBlockChain(Transaction, BlockchainRetriever, byte, database.DatabaseInterface) (bool, error) {
 	return true, nil
 }
 
@@ -69,7 +70,7 @@ func (sendInitGOVVoteTokenMetadata *SendInitGOVVoteTokenMetadata) Hash() *common
 	return &hash
 }
 
-func (sendInitGOVVoteTokenMetadata *SendInitGOVVoteTokenMetadata) ValidateTxWithBlockChain(Transaction, BlockchainRetriever, byte) (bool, error) {
+func (sendInitGOVVoteTokenMetadata *SendInitGOVVoteTokenMetadata) ValidateTxWithBlockChain(Transaction, BlockchainRetriever, byte, database.DatabaseInterface) (bool, error) {
 	return true, nil
 }
 
