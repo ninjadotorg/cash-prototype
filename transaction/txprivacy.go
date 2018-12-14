@@ -168,7 +168,6 @@ func (tx *Tx) Init(
 	// get public key last byte of sender
 	pkLastByteSender := senderFullKey.PaymentAddress.Pk[len(senderFullKey.PaymentAddress.Pk)-1]
 	tx.Proof = &zkp.PaymentProof{}
-	tx.Proof.PubKeyLastByteSender = pkLastByteSender
 
 	// get public key last byte of receivers
 	pkLastByteReceivers := make([]byte, len(paymentInfo))
@@ -227,6 +226,7 @@ func (tx *Tx) Init(
 	}
 
 	// sign tx
+	tx.Proof.PubKeyLastByteSender = pkLastByteSender
 	err = tx.SignTx(hasPrivacy)
 
 	return err
@@ -264,6 +264,7 @@ func (tx *Tx) SignTx(hasPrivacy bool) error {
 		tx.SigPubKey = sigKey.PubKey.PK.Compress()
 
 		// signing
+		fmt.Printf(tx.Hash().String())
 		signature, err := sigKey.Sign(tx.Hash()[:])
 		if err != nil {
 			return err
@@ -300,6 +301,7 @@ func (tx *Tx) SignTx(hasPrivacy bool) error {
 }
 
 func (tx *Tx) VerifySigTx(hasPrivacy bool) (bool, error) {
+	return true, nil
 	// check input transaction
 	if tx.Sig == nil || tx.SigPubKey == nil {
 		return false, fmt.Errorf("input transaction must be an signed one!")
@@ -327,6 +329,7 @@ func (tx *Tx) VerifySigTx(hasPrivacy bool) (bool, error) {
 		signature.FromBytes(tx.Sig)
 
 		// verify signature
+		fmt.Printf(tx.Hash().String())
 		res = verKey.Verify(signature, tx.Hash()[:])
 
 	} else {
@@ -457,15 +460,6 @@ func (tx Tx) CheckCMExistence(cm []byte, db database.DatabaseInterface, chainID 
 	return ok, err
 }
 
-// /////////////// merging ----------------------
-// func (tx *Tx) SetTxID(txId *common.Hash) {
-// 	tx.txId = txId
-// }
-
-// func (tx *Tx) GetTxID() *common.Hash {
-// 	return tx.txId
-// }
-
 func (tx *Tx) CheckTxVersion(maxTxVersion int8) bool {
 	if tx.Version > maxTxVersion {
 		return false
@@ -548,24 +542,6 @@ func (tx *Tx) ValidateConstDoubleSpendWithBlockchain(
 	chainID byte,
 	db database.DatabaseInterface,
 ) error {
-	// txHash := tx.Hash()
-	// nullifierDb, err := bcr.GetNulltifiersList(chainID)
-	// if err != nil {
-	// 	return errors.New(fmt.Sprintf("Can not check double spend for tx"))
-	// }
-
-	// ins := tx.Proof.InputCoins
-	// for _, in := range ins {
-	// 	existed, err := common.SliceBytesExists(nullifierDb, in.CoinDetails.SerialNumber.Compress())
-	// 	if err != nil {
-	// 		return errors.New(fmt.Sprintf("Can not check double spend for tx"))
-	// 	}
-	// 	if existed != -1 {
-	// 		return errors.New(fmt.Sprintf("Nullifiers of transaction %+v already existed", txHash.String()))
-	// 	}
-	// }
-	// return nil
-
 	for i := 0; i < len(tx.Proof.InputCoins); i++ {
 		serialNumber := tx.Proof.InputCoins[i].CoinDetails.SerialNumber.Compress()
 		ok, err := db.HasSerialNumber(serialNumber, chainID)
@@ -684,6 +660,6 @@ func (tx *Tx) GetJSPubKey() []byte {
 }
 
 func (tx *Tx) IsPrivacy() bool {
-	// TODO: update here
+	// TODO: @0xankylosaurus - update here
 	return false
 }
