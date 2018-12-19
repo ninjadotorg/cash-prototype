@@ -2,17 +2,13 @@ package rpcserver
 
 import (
 	"encoding/hex"
-	"errors"
-	"fmt"
 	"net"
 	"strconv"
 
 	"github.com/ninjadotorg/constant/common"
 	"github.com/ninjadotorg/constant/common/base58"
 	"github.com/ninjadotorg/constant/rpcserver/jsonresult"
-	"github.com/ninjadotorg/constant/transaction"
 	"github.com/ninjadotorg/constant/wallet"
-	"github.com/ninjadotorg/constant/privacy-protocol"
 )
 
 type commandHandler func(RpcServer, interface{}, <-chan struct{}) (interface{}, error)
@@ -94,13 +90,17 @@ var RpcHandler = map[string]commandHandler{
 	SendRawSubmitGOVProposalTx:       RpcServer.handleSendRawSubmitGOVProposalTransaction,
 
 	// dcb
-	GetDCBParams:       RpcServer.handleGetDCBParams,
-	GetDCBConstitution: RpcServer.handleGetDCBConstitution,
+	GetDCBParams:                          RpcServer.handleGetDCBParams,
+	GetDCBConstitution:                    RpcServer.handleGetDCBConstitution,
+	CreateAndSendTxWithIssuingRequest:     RpcServer.handleCreateAndSendTxWithIssuingRequest,
+	CreateAndSendTxWithContractingRequest: RpcServer.handleCreateAndSendTxWithContractingRequest,
 
 	// gov
-	GetBondTypes:       RpcServer.handleGetBondTypes,
-	GetGOVConstitution: RpcServer.handleGetGOVConstitution,
-	GetGOVParams:       RpcServer.handleGetGOVParams,
+	GetBondTypes:                      RpcServer.handleGetBondTypes,
+	GetGOVConstitution:                RpcServer.handleGetGOVConstitution,
+	GetGOVParams:                      RpcServer.handleGetGOVParams,
+	CreateAndSendTxWithBuyBackRequest: RpcServer.handleCreateAndSendTxWithBuyBackRequest,
+	CreateAndSendTxWithBuySellRequest: RpcServer.handleCreateAndSendTxWithBuySellRequest,
 }
 
 // Commands that are available to a limited user
@@ -274,150 +274,6 @@ func (self RpcServer) handleCheckHashValue(params interface{}, closeChan <-chan 
 	}, nil
 }
 
-// buildRawCustomTokenTransaction ...
-func (self RpcServer) buildRawCustomTokenTransaction(
-	params interface{},
-) (*transaction.TxCustomToken, error) {
-	// all params
-	arrayParams := common.InterfaceSlice(params)
-
-	// param #1: private key of sender
-	senderKeyParam := arrayParams[0]
-	senderKey, err := wallet.Base58CheckDeserialize(senderKeyParam.(string))
-	if err != nil {
-		return nil, NewRPCError(ErrUnexpected, err)
-	}
-	senderKey.KeySet.ImportFromPrivateKey(&senderKey.KeySet.PrivateKey)
-	lastByte := senderKey.KeySet.PaymentAddress.Pk[len(senderKey.KeySet.PaymentAddress.Pk)-1]
-	chainIdSender, err := common.GetTxSenderChain(lastByte)
-	if err != nil {
-		return nil, NewRPCError(ErrUnexpected, err)
-	}
-
-	// param #2: estimation fee coin per kb
-	estimateFeeCoinPerKb := int64(arrayParams[1].(float64))
-
-	// param #3: estimation fee coin per kb by numblock
-	numBlock := uint32(arrayParams[2].(float64))
-
-	// param #4: token params
-	tokenParamsRaw := arrayParams[3].(map[string]interface{})
-	tokenParams := &transaction.CustomTokenParamTx{
-		PropertyID:     tokenParamsRaw["TokenID"].(string),
-		PropertyName:   tokenParamsRaw["TokenName"].(string),
-		PropertySymbol: tokenParamsRaw["TokenSymbol"].(string),
-		TokenTxType:    int(tokenParamsRaw["TokenTxType"].(float64)),
-		Amount:         uint64(tokenParamsRaw["TokenAmount"].(float64)),
-		Receiver:       transaction.CreateCustomTokenReceiverArray(tokenParamsRaw["TokenReceivers"]),
-	}
-	switch tokenParams.TokenTxType {
-	case transaction.CustomTokenTransfer:
-		{
-			tokenID, _ := common.Hash{}.NewHashFromStr(tokenParams.PropertyID)
-			unspentTxTokenOuts, err := self.config.BlockChain.GetUnspentTxCustomTokenVout(senderKey.KeySet, tokenID)
-			fmt.Println("buildRawCustomTokenTransaction ", unspentTxTokenOuts)
-			if err != nil {
-				return nil, NewRPCError(ErrUnexpected, err)
-			}
-			if len(unspentTxTokenOuts) == 0 {
-				return nil, NewRPCError(ErrUnexpected, errors.New("Balance of token is zero"))
-			}
-			txTokenIns := []transaction.TxTokenVin{}
-			txTokenInsAmount := uint64(0)
-			for _, out := range unspentTxTokenOuts {
-				item := transaction.TxTokenVin{
-					PaymentAddress:  out.PaymentAddress,
-					TxCustomTokenID: out.GetTxCustomTokenID(),
-					VoutIndex:       out.GetIndex(),
-				}
-				// create signature by keyset -> base58check.encode of txtokenout double hash
-				signature, err := senderKey.KeySet.Sign(out.Hash()[:])
-				if err != nil {
-					return nil, NewRPCError(ErrUnexpected, err)
-				}
-				// add signature to TxTokenVin to use token utxo
-				item.Signature = base58.Base58Check{}.Encode(signature, 0)
-				txTokenIns = append(txTokenIns, item)
-				txTokenInsAmount += out.Value
-			}
-			tokenParams.SetVins(txTokenIns)
-			tokenParams.SetVinsAmount(txTokenInsAmount)
-		}
-	case transaction.CustomTokenInit:
-		{
-			if tokenParams.Receiver[0].Value != tokenParams.Amount { // Init with wrong max amount of custom token
-				return nil, NewRPCError(ErrUnexpected, errors.New("Init with wrong max amount of property"))
-			}
-		}
-	}
-
-	totalAmmount := estimateFeeCoinPerKb
-
-	// list unspent tx for estimation fee
-	estimateTotalAmount := totalAmmount
-	outCoins, _ := self.config.BlockChain.GetListOutputCoinsByKeyset(&senderKey.KeySet, chainIdSender)
-	candidateOutputCoins := make([]*privacy.OutputCoin, 0)
-	for _, note := range outCoins {
-		amount := note.CoinDetails.Value
-		candidateOutputCoins = append(candidateOutputCoins, note)
-		estimateTotalAmount -= int64(amount)
-		if estimateTotalAmount <= 0 {
-			break
-		}
-	}
-
-	// check real fee per TxNormal
-	var realFee uint64
-	if int64(estimateFeeCoinPerKb) == -1 {
-		temp, _ := self.config.FeeEstimator[chainIdSender].EstimateFee(numBlock)
-		estimateFeeCoinPerKb = int64(temp)
-	}
-	estimateFeeCoinPerKb += int64(self.config.Wallet.Config.IncrementalFee)
-	// TODO
-	estimateTxSizeInKb := 0
-	//estimateTxSizeInKb := transaction.EstimateTxSize(candidateOutputCoins, nil)
-	realFee = uint64(estimateFeeCoinPerKb) * uint64(estimateTxSizeInKb)
-
-	// list unspent tx for create tx
-	totalAmmount += int64(realFee)
-	if totalAmmount > 0 {
-		candidateOutputCoins = make([]*privacy.OutputCoin, 0)
-		for _, note := range outCoins {
-			amount := note.CoinDetails.Value
-			candidateOutputCoins = append(candidateOutputCoins, note)
-			estimateTotalAmount -= int64(amount)
-			if estimateTotalAmount <= 0 {
-				break
-			}
-		}
-	}
-
-	// get list custom token
-	listCustomTokens, err := self.config.BlockChain.ListCustomToken()
-
-	inputCoins := transaction.ConvertOutputCoinToInputCoin(candidateOutputCoins)
-	tx := &transaction.TxCustomToken{}
-	err = tx.Init(
-		&senderKey.KeySet.PrivateKey,
-		nil,
-		inputCoins,
-		realFee,
-		tokenParams,
-		listCustomTokens,
-	)
-
-	return tx, err
-}
-
-func assertEligibleAgentIDs(eligibleAgentIDs interface{}) []string {
-	assertedEligibleAgentIDs := eligibleAgentIDs.([]interface{})
-	results := []string{}
-	for _, item := range assertedEligibleAgentIDs {
-		results = append(results, item.(string))
-	}
-	return results
-}
-
 /*
 handleGetConnectionCount - RPC returns the number of connections to other nodes.
 */
@@ -436,23 +292,25 @@ func (self RpcServer) handleGetConnectionCount(params interface{}, closeChan <-c
 handleGetGenerate - RPC returns true if the node is set to generate blocks using its CPU
 */
 func (self RpcServer) handleGetGenerate(params interface{}, closeChan <-chan struct{}) (interface{}, error) {
-	return self.config.IsGenerateNode, nil
+	// return self.config.IsGenerateNode, nil
+	return false, nil
 }
 
 /*
 handleGetMiningInfo - RPC returns various mining-related info
 */
 func (self RpcServer) handleGetMiningInfo(params interface{}, closeChan <-chan struct{}) (interface{}, error) {
-	if !self.config.IsGenerateNode {
-		return nil, NewRPCError(ErrUnexpected, errors.New("Not mining"))
-	}
-	chainId := byte(int(params.(float64)))
-	result := jsonresult.GetMiningInfoResult{}
-	result.Blocks = uint64(self.config.BlockChain.BestState[chainId].BestBlock.Header.Height + 1)
-	result.PoolSize = self.config.TxMemPool.Count()
-	result.Chain = self.config.ChainParams.Name
-	result.CurrentBlockTx = len(self.config.BlockChain.BestState[chainId].BestBlock.Transactions)
-	return result, nil
+	// TODO update code to new consensus
+	// if !self.config.IsGenerateNode {
+	// 	return nil, NewRPCError(ErrUnexpected, errors.New("Not mining"))
+	// }
+	// chainId := byte(int(params.(float64)))
+	// result := jsonresult.GetMiningInfoResult{}
+	// result.Blocks = uint64(self.config.BlockChain.BestState[chainId].BestBlock.Header.Height + 1)
+	// result.PoolSize = self.config.TxMemPool.Count()
+	// result.Chain = self.config.ChainParams.Name
+	// result.CurrentBlockTx = len(self.config.BlockChain.BestState[chainId].BestBlock.Transactions)
+	return jsonresult.GetMiningInfoResult{}, nil
 }
 
 /*
@@ -490,21 +348,27 @@ handleEstimateFee - RPC estimates the transaction fee per kilobyte that needs to
 func (self RpcServer) handleEstimateFee(params interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	// Param #1: —how many blocks the transaction may wait before being included
 	arrayParams := common.InterfaceSlice(params)
-	numBlock := uint32(arrayParams[0].(float64))
+	numBlock := uint64(arrayParams[0].(float64))
 	result := jsonresult.EstimateFeeResult{
 		FeeRate: make(map[string]uint64),
 	}
 	for chainID, feeEstimator := range self.config.FeeEstimator {
-		feeRate, err := feeEstimator.EstimateFee(numBlock)
-		result.FeeRate[strconv.Itoa(int(chainID))] = uint64(feeRate)
+		var feeRate uint64
+		var err error
+		temp, err := feeEstimator.EstimateFee(numBlock)
+		if err != nil {
+			feeRate = uint64(temp)
+		}
+		if feeRate == 0 {
+			feeRate = self.config.BlockChain.GetFeePerKbTx()
+		}
+		result.FeeRate[strconv.Itoa(int(chainID))] = feeRate
 		if err != nil {
 			return -1, NewRPCError(ErrUnexpected, err)
 		}
 	}
 	return result, nil
 }
-
-// payment address -> balance of all custom token
 
 // handleEncryptDataByPaymentAddress - get payment address and make an encrypted data
 func (self RpcServer) handleEncryptDataByPaymentAddress(params interface{}, closeChan <-chan struct{}) (interface{}, error) {
