@@ -28,10 +28,6 @@ func (acceptDCBProposalMetadata *AcceptDCBProposalMetadata) ValidateTxWithBlockC
 	return true, nil
 }
 
-func (acceptDCBProposalMetadata *AcceptDCBProposalMetadata) GetType() int {
-	return AcceptDCBProposalMeta
-}
-
 func (acceptDCBProposalMetadata *AcceptDCBProposalMetadata) Hash() *common.Hash {
 	record := string(common.ToBytes(acceptDCBProposalMetadata.DCBProposalTXID))
 	record += string(acceptDCBProposalMetadata.MetadataBase.Hash()[:])

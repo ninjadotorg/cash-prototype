@@ -269,8 +269,7 @@ func (db *db) AddVoteNormalProposalFromOwner(boardType string, startedBlock uint
 	if err != nil {
 		return err
 	}
-	newValueInByte := make([]byte, 4)
-	binary.LittleEndian.PutUint32(newValueInByte, 1)
+	newValueInByte := common.Uint32ToBytes(1)
 	db.Put(keyOwner, newValueInByte)
 
 	key := GetThreePhraseVoteValueKey(boardType, startedBlock, txID)
@@ -315,8 +314,8 @@ func GetVoteDCBBoardListKey(currentCount uint32, startedBlock uint32, candidateP
 func ParseKeyVoteDCBBoardList(key []byte) (uint32, []byte, uint32, error) {
 	realKey := key[len(VoteDCBBoardListPrefix):]
 	startedBlock := common.BytesToUint32(realKey[:4])
-	pubKey := realKey[4 : 4+common.HashSize]
-	currentIndex := common.BytesToUint32(realKey[4+common.HashSize:])
+	pubKey := realKey[4 : 4+common.PubKeyLength]
+	currentIndex := common.BytesToUint32(realKey[4+common.PubKeyLength:])
 	return startedBlock, pubKey, currentIndex, nil
 }
 
@@ -348,8 +347,8 @@ func GetVoteGOVBoardListKey(currentCount uint32, startedBlock uint32, candidateP
 func ParseKeyVoteGOVBoardList(key []byte) (uint32, []byte, uint32, error) {
 	realKey := key[len(VoteGOVBoardListPrefix):]
 	startedBlock := common.BytesToUint32(realKey[:4])
-	pubKey := realKey[4 : 4+common.HashSize]
-	currentIndex := common.BytesToUint32(realKey[4+common.HashSize:])
+	pubKey := realKey[4 : 4+common.PubKeyLength]
+	currentIndex := common.BytesToUint32(realKey[4+common.PubKeyLength:])
 	return startedBlock, pubKey, currentIndex, nil
 }
 
@@ -374,6 +373,11 @@ func ParseKeyThreePhraseCryptoOwner(key []byte) (string, uint32, *common.Hash, e
 	startedBlock := common.BytesToUint32(realKey[3 : 3+4])
 	hash := common.NewHash([]byte(realKey[3+4:]))
 	return string(boardType), uint32(startedBlock), &hash, nil
+}
+
+func ParseValueThreePhraseCryptoOwner(value []byte) (uint32, error) {
+	i := common.BytesToUint32(value)
+	return i, nil
 }
 
 func GetThreePhraseCryptoSealerKey(boardType string, startedBlock uint32, txId *common.Hash) []byte {
@@ -410,8 +414,8 @@ func ParseKeyThreePhraseVoteValue(key []byte) (string, uint32, *common.Hash, err
 	return string(boardType), uint32(startedBlock), &hash, nil
 }
 
-func ParseValueThreePhraseVoteValue(value []byte) (*common.Hash, uint32, error) {
+func ParseValueThreePhraseVoteValue(value []byte) (*common.Hash, int32, error) {
 	txId := common.NewHash(value[:common.HashSize])
-	amount := common.BytesToUint32(value[common.HashSize:])
+	amount := common.BytesToInt32(value[common.HashSize:])
 	return &txId, amount, nil
 }

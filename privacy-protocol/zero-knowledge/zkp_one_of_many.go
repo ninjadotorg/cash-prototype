@@ -27,43 +27,43 @@ type PKOneOfManyProof struct {
 	zd             *big.Int
 	// general info
 	// just send to verifier CommitmentIndexs, don't send commitments list
-	Commitments []*privacy.EllipticPoint
+	Commitments      []*privacy.EllipticPoint
 	CommitmentIndexs []uint64
 	index            byte
 }
 
-func (pro * PKOneOfManyProof) IsNil() bool {
-	if pro.cl == nil{
+func (pro *PKOneOfManyProof) IsNil() bool {
+	if pro.cl == nil {
 		return true
 	}
-	if pro.ca == nil{
+	if pro.ca == nil {
 		return true
 	}
-	if pro.cb == nil{
+	if pro.cb == nil {
 		return true
 	}
-	if pro.cd == nil{
+	if pro.cd == nil {
 		return true
 	}
-	if pro.f == nil{
+	if pro.f == nil {
 		return true
 	}
-	if pro.za == nil{
+	if pro.za == nil {
 		return true
 	}
-	if pro.zb == nil{
+	if pro.zb == nil {
 		return true
 	}
-	if pro.zd == nil{
+	if pro.zd == nil {
 		return true
 	}
-	if pro.CommitmentIndexs == nil{
+	if pro.CommitmentIndexs == nil {
 		return true
 	}
 	return false
 }
 
-func (pro * PKOneOfManyProof) Init() * PKOneOfManyProof {
+func (pro *PKOneOfManyProof) Init() *PKOneOfManyProof {
 	pro.zd = new(big.Int)
 	return pro
 }
@@ -76,7 +76,7 @@ func (wit *PKOneOfManyWitness) Set(
 	indexIsZero uint64,
 	index byte) {
 
-	if wit == nil{
+	if wit == nil {
 		wit = new(PKOneOfManyWitness)
 	}
 
@@ -95,7 +95,7 @@ func (pro *PKOneOfManyProof) Set(
 	zd *big.Int,
 	index byte) {
 
-	if pro == nil{
+	if pro == nil {
 		pro = new(PKOneOfManyProof)
 	}
 
@@ -106,7 +106,7 @@ func (pro *PKOneOfManyProof) Set(
 	pro.index = index
 }
 
-func (pro * PKOneOfManyProof) Bytes() []byte {
+func (pro *PKOneOfManyProof) Bytes() []byte {
 	if pro.IsNil() {
 		return []byte{}
 	}
@@ -197,7 +197,7 @@ func (pro * PKOneOfManyProof) Bytes() []byte {
 
 // SetBytes convert from bytes array to PKOneOfManyProof
 func (pro *PKOneOfManyProof) SetBytes(bytes []byte) error {
-	if pro == nil{
+	if pro == nil {
 		pro = pro.Init()
 	}
 
@@ -220,7 +220,7 @@ func (pro *PKOneOfManyProof) SetBytes(bytes []byte) error {
 	for i := 0; i < n; i++ {
 		pro.cl[i] = new(privacy.EllipticPoint)
 		pro.cl[i], err = privacy.DecompressKey(bytes[offset : offset+33])
-		if err != nil{
+		if err != nil {
 			return err
 		}
 		offset = offset + 33
@@ -230,7 +230,7 @@ func (pro *PKOneOfManyProof) SetBytes(bytes []byte) error {
 	for i := 0; i < n; i++ {
 		pro.ca[i] = new(privacy.EllipticPoint)
 		pro.ca[i], err = privacy.DecompressKey(bytes[offset : offset+33])
-		if err != nil{
+		if err != nil {
 			return err
 		}
 		offset = offset + 33
@@ -240,7 +240,7 @@ func (pro *PKOneOfManyProof) SetBytes(bytes []byte) error {
 	for i := 0; i < n; i++ {
 		pro.cb[i] = new(privacy.EllipticPoint)
 		pro.cb[i], err = privacy.DecompressKey(bytes[offset : offset+33])
-		if err != nil{
+		if err != nil {
 			return err
 		}
 		offset = offset + 33
@@ -251,7 +251,7 @@ func (pro *PKOneOfManyProof) SetBytes(bytes []byte) error {
 	for i := 0; i < n; i++ {
 		pro.cd[i] = new(privacy.EllipticPoint)
 		pro.cd[i], err = privacy.DecompressKey(bytes[offset : offset+33])
-		if err != nil{
+		if err != nil {
 			return err
 		}
 		offset = offset + 33
@@ -343,23 +343,23 @@ func (wit *PKOneOfManyWitness) Prove() (*PKOneOfManyProof, error) {
 	for j := n - 1; j >= 0; j-- {
 		// Generate random numbers
 		r[j], err = rand.Int(rand.Reader, privacy.Curve.Params().N)
-		if err != nil{
+		if err != nil {
 			return nil, err
 		}
 		a[j], err = rand.Int(rand.Reader, privacy.Curve.Params().N)
-		if err != nil{
+		if err != nil {
 			return nil, err
 		}
 		s[j], err = rand.Int(rand.Reader, privacy.Curve.Params().N)
-		if err != nil{
+		if err != nil {
 			return nil, err
 		}
 		t[j], err = rand.Int(rand.Reader, privacy.Curve.Params().N)
-		if err != nil{
+		if err != nil {
 			return nil, err
 		}
 		u[j], err = rand.Int(rand.Reader, privacy.Curve.Params().N)
-		if err != nil{
+		if err != nil {
 			return nil, err
 		}
 
@@ -474,8 +474,6 @@ func (pro *PKOneOfManyProof) Verify() bool {
 		return false
 	}
 	n := privacy.CMRingSizeExp
-
-
 
 	//Calculate x
 	x := big.NewInt(0)
@@ -611,7 +609,6 @@ func TestPKOneOfMany() bool {
 	//proof2 := new(PKOneOfManyProof)
 	//proof2.SetBytes(proofBytes)
 	//fmt.Printf("Proof when set bytes: %v\n", proof)
-
 
 	res := proof.Verify()
 

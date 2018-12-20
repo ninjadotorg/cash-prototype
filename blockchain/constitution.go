@@ -109,3 +109,21 @@ func (DCBConstitutionHelper) GetLowerCaseBoardType() string {
 func (GOVConstitutionHelper) GetLowerCaseBoardType() string {
 	return "gov"
 }
+
+func (DCBConstitutionHelper) CreatePunishDecryptTx(data map[string]interface{}) metadata.Metadata {
+	return metadata.NewPunishDCBDecryptMetadata(data)
+}
+
+func (GOVConstitutionHelper) CreatePunishDecryptTx(data map[string]interface{}) metadata.Metadata {
+	return metadata.NewPunishGOVDecryptMetadata(data)
+}
+
+func (DCBConstitutionHelper) GetSealerPubKey(tx metadata.Transaction) [][]byte {
+	meta := tx.GetMetadata().(*metadata.SealedLv3DCBBallotMetadata)
+	return meta.LockerPubKey
+}
+
+func (GOVConstitutionHelper) GetSealerPubKey(tx metadata.Transaction) [][]byte {
+	meta := tx.GetMetadata().(*metadata.SealedLv3GOVBallotMetadata)
+	return meta.LockerPubKey
+}

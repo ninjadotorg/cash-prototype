@@ -32,6 +32,8 @@ type ConstitutionHelper interface {
 	TxAcceptProposal(txId *common.Hash) metadata.Transaction
 	GetLowerCaseBoardType() string
 	GetEndedBlockHeight(generator *BlkTmplGenerator, chainID byte) uint32
+	CreatePunishDecryptTx(map[string]interface{}) metadata.Metadata
+	GetSealerPubKey(metadata.Transaction) [][]byte
 }
 
 // txPool represents a source of transactions to consider for inclusion in

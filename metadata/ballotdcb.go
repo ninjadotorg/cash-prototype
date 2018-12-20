@@ -43,7 +43,7 @@ func (sealDCBBallotMetadata *SealedDCBBallotMetadata) ValidateTxWithBlockChain(t
 
 func (sealDCBBallotMetadata *SealedDCBBallotMetadata) ValidateSanityData(BlockchainRetriever, Transaction) (bool, bool, error) {
 	for _, i := range sealDCBBallotMetadata.LockerPubKey {
-		if len(i) != common.HashSize {
+		if len(i) != common.PubKeyLength {
 			return true, false, nil
 		}
 	}
@@ -204,7 +204,7 @@ type NormalDCBBallotFromSealerMetadata struct {
 
 func (normalDCBBallotFromSealerMetadata *NormalDCBBallotFromSealerMetadata) ValidateSanityData(BlockchainRetriever, Transaction) (bool, bool, error) {
 	for _, i := range normalDCBBallotFromSealerMetadata.LockerPubKey {
-		if len(i) != common.HashSize {
+		if len(i) != common.PubKeyLength {
 			return true, false, nil
 		}
 	}
@@ -368,7 +368,7 @@ func (normalDCBBallotFromOwnerMetadata *NormalDCBBallotFromOwnerMetadata) Valida
 
 func (normalDCBBallotFromOwnerMetadata *NormalDCBBallotFromOwnerMetadata) ValidateSanityData(BlockchainRetriever, Transaction) (bool, bool, error) {
 	for _, i := range normalDCBBallotFromOwnerMetadata.LockerPubKey {
-		if len(i) != common.HashSize {
+		if len(i) != common.PubKeyLength {
 			return true, false, nil
 		}
 	}
@@ -393,14 +393,32 @@ type PunishDCBDecryptMetadata struct {
 	MetadataBase
 }
 
-func (PunishDCBDecryptMetadata) ValidateTxWithBlockChain(Transaction, BlockchainRetriever, byte, database.DatabaseInterface) (bool, error) {
-	panic("implement me")
+func NewPunishDCBDecryptMetadata(data map[string]interface{}) *PunishDCBDecryptMetadata {
+	return &PunishDCBDecryptMetadata{
+		pubKey: data["pubKey"].([]byte),
+	}
 }
 
-func (PunishDCBDecryptMetadata) ValidateSanityData(BlockchainRetriever, Transaction) (bool, bool, error) {
-	panic("implement me")
+func (punishDCBDecryptMetadata *PunishDCBDecryptMetadata) Hash() *common.Hash {
+	record := string(punishDCBDecryptMetadata.pubKey)
+	record += string(punishDCBDecryptMetadata.MetadataBase.Hash()[:])
+	hash := common.DoubleHashH([]byte(record))
+	return &hash
 }
 
-func (PunishDCBDecryptMetadata) ValidateMetadataByItself() bool {
-	panic("implement me")
+//todo @0xjackalope validate within blockchain and current block
+
+func (punishDCBDecryptMetadata *PunishDCBDecryptMetadata) ValidateTxWithBlockChain(Transaction, BlockchainRetriever, byte, database.DatabaseInterface) (bool, error) {
+	return true, nil
+}
+
+func (punishDCBDecryptMetadata *PunishDCBDecryptMetadata) ValidateSanityData(BlockchainRetriever, Transaction) (bool, bool, error) {
+	if len(punishDCBDecryptMetadata.pubKey) != common.PubKeyLength {
+		return true, false, nil
+	}
+	return true, true, nil
+}
+
+func (punishDCBDecryptMetadata *PunishDCBDecryptMetadata) ValidateMetadataByItself() bool {
+	return true
 }

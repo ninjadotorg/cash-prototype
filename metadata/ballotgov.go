@@ -43,7 +43,7 @@ func (sealGOVBallotMetadata *SealedGOVBallotMetadata) ValidateTxWithBlockChain(t
 
 func (sealGOVBallotMetadata *SealedGOVBallotMetadata) ValidateSanityData(BlockchainRetriever, Transaction) (bool, bool, error) {
 	for _, i := range sealGOVBallotMetadata.LockerPubKey {
-		if len(i) != common.HashSize {
+		if len(i) != common.PubKeyLength {
 			return true, false, nil
 		}
 	}
@@ -204,7 +204,7 @@ type NormalGOVBallotFromSealerMetadata struct {
 
 func (normalGOVBallotFromSealerMetadata *NormalGOVBallotFromSealerMetadata) ValidateSanityData(BlockchainRetriever, Transaction) (bool, bool, error) {
 	for _, i := range normalGOVBallotFromSealerMetadata.LockerPubKey {
-		if len(i) != common.HashSize {
+		if len(i) != common.PubKeyLength {
 			return true, false, nil
 		}
 	}
@@ -368,7 +368,7 @@ func (normalGOVBallotFromOwnerMetadata *NormalGOVBallotFromOwnerMetadata) Valida
 
 func (normalGOVBallotFromOwnerMetadata *NormalGOVBallotFromOwnerMetadata) ValidateSanityData(BlockchainRetriever, Transaction) (bool, bool, error) {
 	for _, i := range normalGOVBallotFromOwnerMetadata.LockerPubKey {
-		if len(i) != common.HashSize {
+		if len(i) != common.PubKeyLength {
 			return true, false, nil
 		}
 	}
@@ -385,5 +385,40 @@ func (normalGOVBallotFromOwnerMetadata *NormalGOVBallotFromOwnerMetadata) Valida
 			}
 		}
 	}
+	return true
+}
+
+type PunishGOVDecryptMetadata struct {
+	pubKey []byte
+	MetadataBase
+}
+
+func NewPunishGOVDecryptMetadata(data map[string]interface{}) *PunishGOVDecryptMetadata {
+	return &PunishGOVDecryptMetadata{
+		pubKey: data["pubKey"].([]byte),
+	}
+}
+
+func (punishGOVDecryptMetadata *PunishGOVDecryptMetadata) Hash() *common.Hash {
+	record := string(punishGOVDecryptMetadata.pubKey)
+	record += string(punishGOVDecryptMetadata.MetadataBase.Hash()[:])
+	hash := common.DoubleHashH([]byte(record))
+	return &hash
+}
+
+//todo @0xjackalope validate within blockchain and current block
+
+func (punishGOVDecryptMetadata *PunishGOVDecryptMetadata) ValidateTxWithBlockChain(Transaction, BlockchainRetriever, byte, database.DatabaseInterface) (bool, error) {
+	return true, nil
+}
+
+func (punishGOVDecryptMetadata *PunishGOVDecryptMetadata) ValidateSanityData(BlockchainRetriever, Transaction) (bool, bool, error) {
+	if len(punishGOVDecryptMetadata.pubKey) != common.PubKeyLength {
+		return true, false, nil
+	}
+	return true, true, nil
+}
+
+func (punishGOVDecryptMetadata *PunishGOVDecryptMetadata) ValidateMetadataByItself() bool {
 	return true
 }

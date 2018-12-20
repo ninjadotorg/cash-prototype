@@ -12,10 +12,6 @@ type AcceptDCBBoardMetadata struct {
 	MetadataBase
 }
 
-func (acceptDCBBoardMetadata *AcceptDCBBoardMetadata) GetType() int {
-	return AcceptDCBProposalMeta
-}
-
 func (acceptDCBBoardMetadata *AcceptDCBBoardMetadata) Hash() *common.Hash {
 	record := ""
 	for _, i := range acceptDCBBoardMetadata.DCBBoardPubKeys {
@@ -36,7 +32,7 @@ func (acceptDCBBoardMetadata *AcceptDCBBoardMetadata) ValidateSanityData(bcr Blo
 		return true, false, nil
 	}
 	for _, i := range acceptDCBBoardMetadata.DCBBoardPubKeys {
-		if len(i) != common.HashSize {
+		if len(i) != common.PubKeyLength {
 			return true, false, nil
 		}
 	}
@@ -78,7 +74,7 @@ func (acceptGOVBoardMetadata *AcceptGOVBoardMetadata) ValidateSanityData(bcr Blo
 		return true, false, nil
 	}
 	for _, i := range acceptGOVBoardMetadata.GOVBoardPubKeys {
-		if len(i) != common.HashSize {
+		if len(i) != common.PubKeyLength {
 			return true, false, nil
 		}
 	}

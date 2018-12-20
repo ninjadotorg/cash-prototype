@@ -36,7 +36,7 @@ func (sendInitDCBVoteTokenMetadata *SendInitDCBVoteTokenMetadata) ValidateTxWith
 }
 
 func (sendInitDCBVoteTokenMetadata *SendInitDCBVoteTokenMetadata) ValidateSanityData(BlockchainRetriever, Transaction) (bool, bool, error) {
-	if len(sendInitDCBVoteTokenMetadata.ReceiverPubKey) != common.HashSize {
+	if len(sendInitDCBVoteTokenMetadata.ReceiverPubKey) != common.PubKeyLength {
 		return true, false, nil
 	}
 	return true, false, nil
@@ -77,7 +77,7 @@ func (sendInitGOVVoteTokenMetadata *SendInitGOVVoteTokenMetadata) ValidateTxWith
 }
 
 func (sendInitGOVVoteTokenMetadata *SendInitGOVVoteTokenMetadata) ValidateSanityData(BlockchainRetriever, Transaction) (bool, bool, error) {
-	if len(sendInitGOVVoteTokenMetadata.ReceiverPubKey) != common.HashSize {
+	if len(sendInitGOVVoteTokenMetadata.ReceiverPubKey) != common.PubKeyLength {
 		return true, false, nil
 	}
 	return true, false, nil
