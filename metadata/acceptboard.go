@@ -12,6 +12,14 @@ type AcceptDCBBoardMetadata struct {
 	MetadataBase
 }
 
+func NewAcceptDCBBoardMetadata(DCBBoardPubKeys [][]byte, startAmountDCBToken uint64) *AcceptDCBBoardMetadata {
+	return &AcceptDCBBoardMetadata{
+		DCBBoardPubKeys:     DCBBoardPubKeys,
+		StartAmountDCBToken: startAmountDCBToken,
+		MetadataBase:        *NewMetadataBase(AcceptDCBBoardMeta),
+	}
+}
+
 func (acceptDCBBoardMetadata *AcceptDCBBoardMetadata) Hash() *common.Hash {
 	record := ""
 	for _, i := range acceptDCBBoardMetadata.DCBBoardPubKeys {
@@ -50,8 +58,12 @@ type AcceptGOVBoardMetadata struct {
 	MetadataBase
 }
 
-func (acceptGOVBoardMetadata *AcceptGOVBoardMetadata) GetType() int {
-	return AcceptGOVProposalMeta
+func NewAcceptGOVBoardMetadata(GOVBoardPubKeys [][]byte, startAmountGOVToken uint64) *AcceptGOVBoardMetadata {
+	return &AcceptGOVBoardMetadata{
+		GOVBoardPubKeys:     GOVBoardPubKeys,
+		StartAmountGOVToken: startAmountGOVToken,
+		MetadataBase:        *NewMetadataBase(AcceptGOVBoardMeta),
+	}
 }
 
 func (acceptGOVBoardMetadata *AcceptGOVBoardMetadata) Hash() *common.Hash {
@@ -60,7 +72,8 @@ func (acceptGOVBoardMetadata *AcceptGOVBoardMetadata) Hash() *common.Hash {
 		record += string(i)
 	}
 	record += string(acceptGOVBoardMetadata.StartAmountGOVToken)
-	record += string(acceptGOVBoardMetadata.MetadataBase.Hash()[:])
+	x := acceptGOVBoardMetadata.MetadataBase.Hash()
+	record += string(x[:])
 	hash := common.DoubleHashH([]byte(record))
 	return &hash
 }

@@ -12,15 +12,13 @@ type SendInitDCBVoteTokenMetadata struct {
 	MetadataBase
 }
 
-func NewSendInitDCBVoteTokenMetadata(data map[string]interface{}) *SendInitDCBVoteTokenMetadata {
-	sendInitDCBVoteTokenMetadata := SendInitDCBVoteTokenMetadata{
-		Amount:         data["Amount"].(uint64),
-		ReceiverPubKey: data["ReceiverPubkey"].([]byte),
-		MetadataBase: MetadataBase{
-			Type: SendInitDCBVoteTokenMeta,
-		},
+func NewSendInitDCBVoteTokenMetadata(amount uint64, receiverPubKey []byte) *SendInitDCBVoteTokenMetadata {
+	return &SendInitDCBVoteTokenMetadata{
+		Amount:         amount,
+		ReceiverPubKey: receiverPubKey,
+		MetadataBase:   *NewMetadataBase(SendInitDCBVoteTokenMeta),
 	}
-	return &sendInitDCBVoteTokenMetadata
+
 }
 
 func (sendInitDCBVoteTokenMetadata *SendInitDCBVoteTokenMetadata) Hash() *common.Hash {
@@ -53,15 +51,13 @@ type SendInitGOVVoteTokenMetadata struct {
 	MetadataBase
 }
 
-func NewSendInitGOVVoteTokenMetadata(data map[string]interface{}) *SendInitGOVVoteTokenMetadata {
-	sendInitGOVVoteTokenMetadata := SendInitGOVVoteTokenMetadata{
-		Amount:         data["Amount"].(uint64),
-		ReceiverPubKey: data["ReceiverPubkey"].([]byte),
-		MetadataBase: MetadataBase{
-			Type: SendInitGOVVoteTokenMeta,
-		},
+func NewSendInitGOVVoteTokenMetadata(amount uint64, receiverPubKey []byte) *SendInitGOVVoteTokenMetadata {
+	return &SendInitGOVVoteTokenMetadata{
+		Amount:         amount,
+		ReceiverPubKey: receiverPubKey,
+		MetadataBase:   *NewMetadataBase(SendInitGOVVoteTokenMeta),
 	}
-	return &sendInitGOVVoteTokenMetadata
+
 }
 
 func (sendInitGOVVoteTokenMetadata *SendInitGOVVoteTokenMetadata) Hash() *common.Hash {

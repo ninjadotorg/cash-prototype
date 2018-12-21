@@ -7,18 +7,22 @@ import (
 
 //abstract class
 type SealedGOVBallotMetadata struct {
-	SealedBallot []byte
-	LockerPubKey [][]byte
+	SealedBallot  []byte
+	LockerPubKeys [][]byte
+}
 
-	MetadataBase
+func NewSealedGOVBallotMetadata(sealedBallot []byte, lockerPubKeys [][]byte) *SealedGOVBallotMetadata {
+	return &SealedGOVBallotMetadata{
+		SealedBallot:  sealedBallot,
+		LockerPubKeys: lockerPubKeys,
+	}
 }
 
 func (sealGOVBallotMetadata *SealedGOVBallotMetadata) Hash() *common.Hash {
 	record := string(sealGOVBallotMetadata.SealedBallot)
-	for _, i := range sealGOVBallotMetadata.LockerPubKey {
+	for _, i := range sealGOVBallotMetadata.LockerPubKeys {
 		record += string(i)
 	}
-	record += string(sealGOVBallotMetadata.MetadataBase.Hash()[:])
 	hash := common.DoubleHashH([]byte(record))
 	return &hash
 }
@@ -26,7 +30,7 @@ func (sealGOVBallotMetadata *SealedGOVBallotMetadata) Hash() *common.Hash {
 func (sealGOVBallotMetadata *SealedGOVBallotMetadata) ValidateTxWithBlockChain(tx Transaction, bcr BlockchainRetriever, chainID byte, db database.DatabaseInterface) (bool, error) {
 	//Validate these pubKeys are in board
 	govBoardPubKeys := bcr.GetGOVBoardPubKeys()
-	for _, j := range sealGOVBallotMetadata.LockerPubKey {
+	for _, j := range sealGOVBallotMetadata.LockerPubKeys {
 		exist := false
 		for _, i := range govBoardPubKeys {
 			if common.ByteEqual(i, j) {
@@ -42,7 +46,7 @@ func (sealGOVBallotMetadata *SealedGOVBallotMetadata) ValidateTxWithBlockChain(t
 }
 
 func (sealGOVBallotMetadata *SealedGOVBallotMetadata) ValidateSanityData(BlockchainRetriever, Transaction) (bool, bool, error) {
-	for _, i := range sealGOVBallotMetadata.LockerPubKey {
+	for _, i := range sealGOVBallotMetadata.LockerPubKeys {
 		if len(i) != common.PubKeyLength {
 			return true, false, nil
 		}
@@ -51,10 +55,10 @@ func (sealGOVBallotMetadata *SealedGOVBallotMetadata) ValidateSanityData(Blockch
 }
 
 func (sealGOVBallotMetadata *SealedGOVBallotMetadata) ValidateMetadataByItself() bool {
-	for index1 := 0; index1 < len(sealGOVBallotMetadata.LockerPubKey); index1++ {
-		pub1 := sealGOVBallotMetadata.LockerPubKey[index1]
-		for index2 := index1 + 1; index2 < len(sealGOVBallotMetadata.LockerPubKey); index2++ {
-			pub2 := sealGOVBallotMetadata.LockerPubKey[index2]
+	for index1 := 0; index1 < len(sealGOVBallotMetadata.LockerPubKeys); index1++ {
+		pub1 := sealGOVBallotMetadata.LockerPubKeys[index1]
+		for index2 := index1 + 1; index2 < len(sealGOVBallotMetadata.LockerPubKeys); index2++ {
+			pub2 := sealGOVBallotMetadata.LockerPubKeys[index2]
 			if !common.ByteEqual(pub1, pub2) {
 				return false
 			}
@@ -67,19 +71,15 @@ type SealedLv1GOVBallotMetadata struct {
 	SealedGOVBallotMetadata
 	PointerToLv2Ballot common.Hash
 	PointerToLv3Ballot common.Hash
+	MetadataBase
 }
 
-func NewSealedLv1GOVBallotMetadata(data map[string]interface{}) *SealedLv1GOVBallotMetadata {
+func NewSealedLv1GOVBallotMetadata(sealedBallot []byte, lockersPubKey [][]byte, pointerToLv2Ballot common.Hash, pointerToLv3Ballot common.Hash) *SealedLv1GOVBallotMetadata {
 	return &SealedLv1GOVBallotMetadata{
-		SealedGOVBallotMetadata: SealedGOVBallotMetadata{
-			SealedBallot: data["SealedBallot"].([]byte),
-			LockerPubKey: data["LockerPubKey"].([][]byte),
-			MetadataBase: MetadataBase{
-				Type: SealedLv1GOVBallotMeta,
-			},
-		},
-		PointerToLv2Ballot: data["PointerToLv2Ballot"].(common.Hash),
-		PointerToLv3Ballot: data["PointerToLv3Ballot"].(common.Hash),
+		SealedGOVBallotMetadata: *NewSealedGOVBallotMetadata(sealedBallot, lockersPubKey),
+		PointerToLv2Ballot:      pointerToLv2Ballot,
+		PointerToLv3Ballot:      pointerToLv3Ballot,
+		MetadataBase:            *NewMetadataBase(SealedLv1GOVBallotMeta),
 	}
 }
 
@@ -111,14 +111,14 @@ func (sealedLv1GOVBallotMetadata *SealedLv1GOVBallotMetadata) ValidateTxWithBloc
 
 	// check 2 array equal
 	metaLv2 := lv2Tx.GetMetadata().(*SealedLv2GOVBallotMetadata)
-	for i := 0; i < len(sealedLv1GOVBallotMetadata.LockerPubKey); i++ {
-		if !common.ByteEqual(sealedLv1GOVBallotMetadata.LockerPubKey[i], metaLv2.LockerPubKey[i]) {
+	for i := 0; i < len(sealedLv1GOVBallotMetadata.LockerPubKeys); i++ {
+		if !common.ByteEqual(sealedLv1GOVBallotMetadata.LockerPubKeys[i], metaLv2.LockerPubKeys[i]) {
 			return false, nil
 		}
 	}
 
 	// Check encrypting
-	if !common.ByteEqual(sealedLv1GOVBallotMetadata.SealedBallot, common.Encrypt(metaLv2.SealedBallot, metaLv2.LockerPubKey[1]).([]byte)) {
+	if !common.ByteEqual(sealedLv1GOVBallotMetadata.SealedBallot, common.Encrypt(metaLv2.SealedBallot, metaLv2.LockerPubKeys[1]).([]byte)) {
 		return false, nil
 	}
 	return true, nil
@@ -127,18 +127,14 @@ func (sealedLv1GOVBallotMetadata *SealedLv1GOVBallotMetadata) ValidateTxWithBloc
 type SealedLv2GOVBallotMetadata struct {
 	SealedGOVBallotMetadata
 	PointerToLv3Ballot common.Hash
+	MetadataBase
 }
 
-func NewSealedLv2GOVBallotMetadata(data map[string]interface{}) *SealedLv2GOVBallotMetadata {
+func NewSealedLv2GOVBallotMetadata(sealedBallot []byte, lockerPubKeys [][]byte, pointerToLv3Ballot common.Hash) *SealedLv2GOVBallotMetadata {
 	return &SealedLv2GOVBallotMetadata{
-		SealedGOVBallotMetadata: SealedGOVBallotMetadata{
-			SealedBallot: data["SealedBallot"].([]byte),
-			LockerPubKey: data["LockerPubKey"].([][]byte),
-			MetadataBase: MetadataBase{
-				Type: SealedLv2GOVBallotMeta,
-			},
-		},
-		PointerToLv3Ballot: data["PointerToLv3Ballot"].(common.Hash),
+		SealedGOVBallotMetadata: *NewSealedGOVBallotMetadata(sealedBallot, lockerPubKeys),
+		PointerToLv3Ballot:      pointerToLv3Ballot,
+		MetadataBase:            *NewMetadataBase(SealedLv2GOVBallotMeta),
 	}
 }
 
@@ -165,14 +161,14 @@ func (sealedLv2GOVBallotMetadata *SealedLv2GOVBallotMetadata) ValidateTxWithBloc
 
 	// check 2 array equal
 	metaLv3 := lv3Tx.GetMetadata().(*SealedLv3GOVBallotMetadata)
-	for i := 0; i < len(sealedLv2GOVBallotMetadata.LockerPubKey); i++ {
-		if !common.ByteEqual(sealedLv2GOVBallotMetadata.LockerPubKey[i], metaLv3.LockerPubKey[i]) {
+	for i := 0; i < len(sealedLv2GOVBallotMetadata.LockerPubKeys); i++ {
+		if !common.ByteEqual(sealedLv2GOVBallotMetadata.LockerPubKeys[i], metaLv3.LockerPubKeys[i]) {
 			return false, nil
 		}
 	}
 
 	// Check encrypting
-	if !common.ByteEqual(sealedLv2GOVBallotMetadata.SealedBallot, common.Encrypt(metaLv3.SealedBallot, metaLv3.LockerPubKey[2]).([]byte)) {
+	if !common.ByteEqual(sealedLv2GOVBallotMetadata.SealedBallot, common.Encrypt(metaLv3.SealedBallot, metaLv3.LockerPubKeys[2]).([]byte)) {
 		return false, nil
 	}
 	return true, nil
@@ -180,17 +176,13 @@ func (sealedLv2GOVBallotMetadata *SealedLv2GOVBallotMetadata) ValidateTxWithBloc
 
 type SealedLv3GOVBallotMetadata struct {
 	SealedGOVBallotMetadata
+	MetadataBase
 }
 
-func NewSealedLv3GOVBallotMetadata(data map[string]interface{}) *SealedLv3GOVBallotMetadata {
+func NewSealedLv3GOVBallotMetadata(sealedBallot []byte, lockerPubKeys [][]byte) *SealedLv3GOVBallotMetadata {
 	return &SealedLv3GOVBallotMetadata{
-		SealedGOVBallotMetadata: SealedGOVBallotMetadata{
-			SealedBallot: data["SealedBallot"].([]byte),
-			LockerPubKey: data["LockerPubKey"].([][]byte),
-			MetadataBase: MetadataBase{
-				Type: SealedLv3GOVBallotMeta,
-			},
-		},
+		SealedGOVBallotMetadata: *NewSealedGOVBallotMetadata(sealedBallot, lockerPubKeys),
+		MetadataBase:            *NewMetadataBase(SealedLv3GOVBallotMeta),
 	}
 }
 
@@ -200,6 +192,16 @@ type NormalGOVBallotFromSealerMetadata struct {
 	PointerToLv1Ballot common.Hash
 	PointerToLv3Ballot common.Hash
 	MetadataBase
+}
+
+func NewNormalGOVBallotFromSealerMetadata(ballot []byte, lockerPubKey [][]byte, pointerToLv1Ballot common.Hash, pointerToLv3Ballot common.Hash) *NormalGOVBallotFromSealerMetadata {
+	return &NormalGOVBallotFromSealerMetadata{
+		Ballot:             ballot,
+		LockerPubKey:       lockerPubKey,
+		PointerToLv1Ballot: pointerToLv1Ballot,
+		PointerToLv3Ballot: pointerToLv3Ballot,
+		MetadataBase:       *NewMetadataBase(NormalGOVBallotMetaFromSealerMeta),
+	}
 }
 
 func (normalGOVBallotFromSealerMetadata *NormalGOVBallotFromSealerMetadata) ValidateSanityData(BlockchainRetriever, Transaction) (bool, bool, error) {
@@ -222,18 +224,6 @@ func (normalGOVBallotFromSealerMetadata *NormalGOVBallotFromSealerMetadata) Vali
 		}
 	}
 	return true
-}
-
-func NewNormalGOVBallotFromSealerMetadata(data map[string]interface{}) *NormalGOVBallotFromSealerMetadata {
-	return &NormalGOVBallotFromSealerMetadata{
-		Ballot:             data["Ballot"].([]byte),
-		LockerPubKey:       data["LockerPubKey"].([][]byte),
-		PointerToLv1Ballot: data["PointerToLv1Ballot"].(common.Hash),
-		PointerToLv3Ballot: data["PointerToLv3Ballot"].(common.Hash),
-		MetadataBase: MetadataBase{
-			Type: NormalGOVBallotMetaFromSealer,
-		},
-	}
 }
 
 func (normalGOVBallotFromSealerMetadata *NormalGOVBallotFromSealerMetadata) Hash() *common.Hash {
@@ -277,13 +267,13 @@ func (normalGOVBallotFromSealerMetadata *NormalGOVBallotFromSealerMetadata) Vali
 	// check 2 array equal
 	metaLv1 := lv1Tx.GetMetadata().(*SealedLv1GOVBallotMetadata)
 	for i := 0; i < len(normalGOVBallotFromSealerMetadata.LockerPubKey); i++ {
-		if !common.ByteEqual(normalGOVBallotFromSealerMetadata.LockerPubKey[i], metaLv1.LockerPubKey[i]) {
+		if !common.ByteEqual(normalGOVBallotFromSealerMetadata.LockerPubKey[i], metaLv1.LockerPubKeys[i]) {
 			return false, nil
 		}
 	}
 
 	// Check encrypting
-	if !common.ByteEqual(normalGOVBallotFromSealerMetadata.Ballot, common.Encrypt(metaLv1.SealedBallot, metaLv1.LockerPubKey[0]).([]byte)) {
+	if !common.ByteEqual(normalGOVBallotFromSealerMetadata.Ballot, common.Encrypt(metaLv1.SealedBallot, metaLv1.LockerPubKeys[0]).([]byte)) {
 		return false, nil
 	}
 	return true, nil
@@ -296,14 +286,12 @@ type NormalGOVBallotFromOwnerMetadata struct {
 	MetadataBase
 }
 
-func NewNormalGOVBallotFromOwnerMetadata(data map[string]interface{}) *NormalGOVBallotFromOwnerMetadata {
+func NewNormalGOVBallotFromOwnerMetadata(ballot []byte, lockerPubKey [][]byte, pointerToLv3Ballot common.Hash) *NormalGOVBallotFromOwnerMetadata {
 	return &NormalGOVBallotFromOwnerMetadata{
-		Ballot:             data["Ballot"].([]byte),
-		LockerPubKey:       data["LockerPubKey"].([][]byte),
-		PointerToLv3Ballot: data["PointerToLv3Ballot"].(common.Hash),
-		MetadataBase: MetadataBase{
-			Type: NormalGOVBallotMetaFromOwner,
-		},
+		Ballot:             ballot,
+		LockerPubKey:       lockerPubKey,
+		PointerToLv3Ballot: pointerToLv3Ballot,
+		MetadataBase:       *NewMetadataBase(NormalGOVBallotMetaFromOwnerMeta),
 	}
 }
 
@@ -343,7 +331,7 @@ func (normalGOVBallotFromOwnerMetadata *NormalGOVBallotFromOwnerMetadata) Valida
 	// check 2 array equal
 	metaLv3 := lv3Tx.GetMetadata().(*SealedLv3GOVBallotMetadata)
 	for i := 0; i < len(normalGOVBallotFromOwnerMetadata.LockerPubKey); i++ {
-		if !common.ByteEqual(normalGOVBallotFromOwnerMetadata.LockerPubKey[i], metaLv3.LockerPubKey[i]) {
+		if !common.ByteEqual(normalGOVBallotFromOwnerMetadata.LockerPubKey[i], metaLv3.LockerPubKeys[i]) {
 			return false, nil
 		}
 	}
@@ -355,11 +343,11 @@ func (normalGOVBallotFromOwnerMetadata *NormalGOVBallotFromOwnerMetadata) Valida
 			common.Encrypt(
 				common.Encrypt(
 					normalGOVBallotFromOwnerMetadata.Ballot,
-					metaLv3.LockerPubKey[2],
+					metaLv3.LockerPubKeys[2],
 				),
-				metaLv3.LockerPubKey[1],
+				metaLv3.LockerPubKeys[1],
 			),
-			metaLv3.LockerPubKey[0],
+			metaLv3.LockerPubKeys[0],
 		).([]byte)) {
 		return false, nil
 	}
@@ -393,9 +381,10 @@ type PunishGOVDecryptMetadata struct {
 	MetadataBase
 }
 
-func NewPunishGOVDecryptMetadata(data map[string]interface{}) *PunishGOVDecryptMetadata {
+func NewPunishGOVDecryptMetadata(pubKey []byte) *PunishGOVDecryptMetadata {
 	return &PunishGOVDecryptMetadata{
-		pubKey: data["pubKey"].([]byte),
+		pubKey:       pubKey,
+		MetadataBase: *NewMetadataBase(PunishGOVDecryptMeta),
 	}
 }
 

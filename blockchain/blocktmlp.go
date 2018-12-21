@@ -29,11 +29,12 @@ type ConstitutionHelper interface {
 	CheckSubmitProposalType(tx metadata.Transaction) bool
 	CheckVotingProposalType(tx metadata.Transaction) bool
 	GetAmountVoteToken(tx metadata.Transaction) uint64
-	TxAcceptProposal(txId *common.Hash) metadata.Transaction
+	TxAcceptProposal(txId *common.Hash, voter voting.Voter) metadata.Transaction
 	GetLowerCaseBoardType() string
 	GetEndedBlockHeight(generator *BlkTmplGenerator, chainID byte) uint32
 	CreatePunishDecryptTx(map[string]interface{}) metadata.Metadata
 	GetSealerPubKey(metadata.Transaction) [][]byte
+	TxRewardProposalSubmitter(pubKey []byte) metadata.Transaction
 }
 
 // txPool represents a source of transactions to consider for inclusion in
@@ -170,11 +171,11 @@ func (blockgen *BlkTmplGenerator) NewBlockTemplate(payToAddress *privacy.Payment
 				buyBackCoins += (buyBackFromInfo.buyBackPrice + buyBackFromInfo.value)
 				buyBackFromInfos = append(buyBackFromInfos, buyBackFromInfo)
 			}
-		case metadata.NormalDCBBallotMetaFromSealer:
+		case metadata.NormalDCBBallotMetaFromSealerMeta:
 			if !(currentBlockHeight < endedDCBPivot && currentBlockHeight >= lv1DCBPivot) {
 				continue
 			}
-		case metadata.NormalDCBBallotMetaFromOwner:
+		case metadata.NormalDCBBallotMetaFromOwnerMeta:
 			if !(currentBlockHeight < endedDCBPivot && currentBlockHeight >= lv1DCBPivot) {
 				continue
 			}
@@ -190,11 +191,11 @@ func (blockgen *BlkTmplGenerator) NewBlockTemplate(payToAddress *privacy.Payment
 			if !(currentBlockHeight < lv3DCBPivot && currentBlockHeight >= startedDCBPivot) {
 				continue
 			}
-		case metadata.NormalGOVBallotMetaFromSealer:
+		case metadata.NormalGOVBallotMetaFromSealerMeta:
 			if !(currentBlockHeight < endedGOVPivot && currentBlockHeight >= lv1GOVPivot) {
 				continue
 			}
-		case metadata.NormalGOVBallotMetaFromOwner:
+		case metadata.NormalGOVBallotMetaFromOwnerMeta:
 			if !(currentBlockHeight < endedGOVPivot && currentBlockHeight >= lv1GOVPivot) {
 				continue
 			}
@@ -298,7 +299,7 @@ concludeBlock:
 		return nil, err
 	}
 	// create buy-back response txs to distribute constants to buy-back requesters
-	buyBackResTxs, err := blockgen.buildBuyBackResponsesTx(buyBackFromInfos, chainID, privatekey)
+	buyBackResTxs, err := blockgen.buildBuyBackResponseTxs(buyBackFromInfos, chainID, privatekey)
 	if err != nil {
 		Logger.log.Error(err)
 		return nil, err
@@ -310,6 +311,16 @@ concludeBlock:
 	refundTxs, totalRefundAmt := blockgen.buildRefundTxs(chainID, remainingFund, privatekey)
 
 	issuingResTxs, err := blockgen.buildIssuingResTxs(chainID, issuingReqTxs, privatekey)
+	if err != nil {
+		Logger.log.Error(err)
+		return nil, err
+	}
+	evals, err := blockgen.updateOracleValues()
+	if err != nil {
+		Logger.log.Error(err)
+		return nil, err
+	}
+	oracleRewardTxs, totalOracleRewards, err := blockgen.buildOracleRewardTxs(evals, chainID, privatekey)
 	if err != nil {
 		Logger.log.Error(err)
 		return nil, err
@@ -333,6 +344,8 @@ concludeBlock:
 			Logger.log.Error(err)
 			return nil, err
 		}
+		rewardTx, err := blockgen.createRewardProposalTx(chainID, DCBConstitutionHelper{})
+		coinbases = append(coinbases, rewardTx)
 	}
 	if blockgen.neededNewGOVConstitution(chainID) {
 		tx, err := blockgen.createAcceptConstitutionAndPunishTx(chainID, GOVConstitutionHelper{})
@@ -341,6 +354,8 @@ concludeBlock:
 			Logger.log.Error(err)
 			return nil, err
 		}
+		rewardTx, err := blockgen.createRewardProposalTx(chainID, GOVConstitutionHelper{})
+		coinbases = append(coinbases, rewardTx)
 	}
 
 	if int32(prevBlock.Header.DCBGovernor.EndBlock) == prevBlock.Header.Height+1 {
@@ -394,6 +409,9 @@ concludeBlock:
 	for _, refundTx := range refundTxs {
 		coinbases = append(coinbases, refundTx)
 	}
+	for _, oracleRewardTx := range oracleRewardTxs {
+		coinbases = append(coinbases, oracleRewardTx)
+	}
 
 	txsToAdd = append(coinbases, txsToAdd...)
 
@@ -402,7 +420,7 @@ concludeBlock:
 	}
 
 	// Check for final balance of DCB and GOV
-	if currentSalaryFund+totalFee+salaryFundAdd+incomeFromBonds < totalSalary+govPayoutAmount+buyBackCoins+totalRefundAmt {
+	if currentSalaryFund+totalFee+salaryFundAdd+incomeFromBonds < totalSalary+govPayoutAmount+buyBackCoins+totalRefundAmt+totalOracleRewards {
 		return nil, fmt.Errorf("Gov fund is not enough for salary and dividend payout")
 	}
 
@@ -428,7 +446,7 @@ concludeBlock:
 		BlockCommitteeSigs: make([]string, common.TotalValidators),
 		Committee:          make([]string, common.TotalValidators),
 		ChainID:            chainID,
-		SalaryFund:         currentSalaryFund + incomeFromBonds + totalFee + salaryFundAdd - totalSalary - govPayoutAmount - buyBackCoins - totalRefundAmt,
+		SalaryFund:         currentSalaryFund + incomeFromBonds + totalFee + salaryFundAdd - totalSalary - govPayoutAmount - buyBackCoins - totalRefundAmt - totalOracleRewards,
 		BankFund:           prevBlock.Header.BankFund + loanPaymentAmount - bankPayoutAmount,
 		GOVConstitution:    prevBlock.Header.GOVConstitution, // TODO: need get from gov-params tx
 		DCBConstitution:    prevBlock.Header.DCBConstitution, // TODO: need get from dcb-params tx
@@ -440,6 +458,7 @@ concludeBlock:
 		block.Header.DCBConstitution.DCBParams.SaleDBCTOkensByUSDData.Amount -= dcbTokensSold
 	}
 
+	//Change block header by tx inside it's transaction
 	for _, tx := range txsToAdd {
 		if err := block.AddTransaction(tx); err != nil {
 			return nil, err
@@ -633,15 +652,14 @@ func buildSingleBuySellResponseTx(
 	bondID := fmt.Sprintf("%s%s%s", sellingBondsParam.Maturity, sellingBondsParam.BuyBackPrice, sellingBondsParam.StartSellingAt)
 	additionalSuffix := make([]byte, 24-len(bondID))
 	bondIDBytes := append([]byte(bondID), additionalSuffix...)
-
-	buySellRes := metadata.BuySellResponse{
-		RequestedTxID:  buySellReqTx.Hash(),
-		StartSellingAt: sellingBondsParam.StartSellingAt,
-		Maturity:       sellingBondsParam.Maturity,
-		BuyBackPrice:   sellingBondsParam.BuyBackPrice,
-		BondID:         bondIDBytes,
-	}
-	buySellRes.Type = metadata.BuyFromGOVResponseMeta
+	buySellRes := metadata.NewBuySellResponse(
+		*buySellReqTx.Hash(),
+		sellingBondsParam.StartSellingAt,
+		sellingBondsParam.Maturity,
+		sellingBondsParam.BuyBackPrice,
+		bondIDBytes,
+		metadata.BuyFromGOVResponseMeta,
+	)
 
 	buySellReqMeta := buySellReqTx.GetMetadata()
 	buySellReq, ok := buySellReqMeta.(*metadata.BuySellRequest)
@@ -668,7 +686,7 @@ func buildSingleBuySellResponseTx(
 		TxTokenData: txTokenData,
 	}
 	resTx.Type = common.TxCustomTokenType
-	resTx.Metadata = &buySellRes
+	resTx.SetMetadata(buySellRes)
 	return resTx, nil
 }
 
@@ -764,7 +782,7 @@ func (blockgen *BlkTmplGenerator) checkBuyBackReqTx(
 	return buyBackFromInfo, true
 }
 
-func (blockgen *BlkTmplGenerator) buildBuyBackResponsesTx(
+func (blockgen *BlkTmplGenerator) buildBuyBackResponseTxs(
 	buyBackFromInfos []*buyBackFromInfo,
 	chainID byte,
 	privatekey *privacy.SpendingKey,
@@ -781,10 +799,7 @@ func (blockgen *BlkTmplGenerator) buildBuyBackResponsesTx(
 		if err != nil {
 			return []*transaction.Tx{}, err
 		}
-		buyBackRes := &metadata.BuyBackResponse{
-			RequestedTxID: buyBackFromInfo.requestedTxID,
-		}
-		buyBackRes.Type = metadata.BuyBackResponseMeta
+		buyBackRes := metadata.NewBuyBackResponse(*buyBackFromInfo.requestedTxID, metadata.BuyBackResponseMeta)
 		buyBackResTx.SetMetadata(buyBackRes)
 		buyBackResTxs = append(buyBackResTxs, buyBackResTx)
 	}
@@ -835,10 +850,7 @@ func (blockgen *BlkTmplGenerator) buildIssuingResTxs(
 			return []metadata.Transaction{}, errors.New("Could not parse IssuingRequest metadata.")
 		}
 		if issuingReq.AssetType == common.DCBTokenID {
-			issuingRes := metadata.IssuingResponse{
-				RequestedTxID: issuingReqTx.Hash(),
-			}
-			issuingRes.Type = metadata.IssuingResponseMeta
+			issuingRes := metadata.NewIssuingResponse(*issuingReqTx.Hash(), metadata.IssuingResponseMeta)
 			dcbTokenPrice := uint64(1)
 			if oracleParams.DCBToken != 0 {
 				dcbTokenPrice = oracleParams.DCBToken
@@ -861,7 +873,7 @@ func (blockgen *BlkTmplGenerator) buildIssuingResTxs(
 				TxTokenData: txTokenData,
 			}
 			resTx.Type = common.TxCustomTokenType
-			resTx.Metadata = &issuingRes
+			resTx.SetMetadata(issuingRes)
 			issuingResTxs = append(issuingResTxs, resTx)
 			continue
 		}
@@ -875,10 +887,7 @@ func (blockgen *BlkTmplGenerator) buildIssuingResTxs(
 			if err != nil {
 				return []metadata.Transaction{}, err
 			}
-			issuingRes := &metadata.IssuingResponse{
-				RequestedTxID: issuingReqTx.Hash(),
-			}
-			issuingRes.Type = metadata.IssuingResponseMeta
+			issuingRes := metadata.NewIssuingResponse(*issuingReqTx.Hash(), metadata.IssuingResponseMeta)
 			resTx.SetMetadata(issuingRes)
 			issuingResTxs = append(issuingResTxs, resTx)
 		}
@@ -887,6 +896,7 @@ func (blockgen *BlkTmplGenerator) buildIssuingResTxs(
 }
 
 func calculateAmountOfRefundTxs(
+	smallTxHashes []*common.Hash,
 	addresses []*privacy.PaymentAddress,
 	estimatedRefundAmt uint64,
 	remainingFund uint64,
@@ -908,7 +918,8 @@ func calculateAmountOfRefundTxs(
 			Logger.log.Error(err)
 			continue
 		}
-		refundTx.Type = common.TxRefundType
+		refundMeta := metadata.NewRefund(*smallTxHashes[i], metadata.RefundMeta)
+		refundTx.SetMetadata(refundMeta)
 		refundTxs = append(refundTxs, refundTx)
 	}
 	return refundTxs, amt
@@ -940,7 +951,8 @@ func (blockgen *BlkTmplGenerator) buildRefundTxs(
 		Logger.log.Error(err)
 		return []*transaction.Tx{}, 0
 	}
-	var addresses []*privacy.PaymentAddress
+	addresses := []*privacy.PaymentAddress{}
+	smallTxHashes := []*common.Hash{}
 	estimatedRefundAmt := uint64(0)
 	for _, tx := range lookbackBlock.Transactions {
 		if tx.GetType() != common.TxNormalType {
@@ -955,12 +967,14 @@ func (blockgen *BlkTmplGenerator) buildRefundTxs(
 			continue
 		}
 		addresses = append(addresses, addr)
+		smallTxHashes = append(smallTxHashes, tx.Hash())
 		estimatedRefundAmt += refundInfo.RefundAmount
 	}
 	if len(addresses) == 0 {
 		return []*transaction.Tx{}, 0
 	}
 	refundTxs, totalRefundAmt := calculateAmountOfRefundTxs(
+		smallTxHashes,
 		addresses,
 		estimatedRefundAmt,
 		remainingFund,
@@ -1010,7 +1024,8 @@ func (blockgen *BlkTmplGenerator) processLoan(sourceTxns []*metadata.TxDesc, pro
 				continue
 			}
 			unlockMeta := &metadata.LoanUnlock{
-				LoanID: make([]byte, len(withdrawMeta.LoanID)),
+				LoanID:       make([]byte, len(withdrawMeta.LoanID)),
+				MetadataBase: metadata.MetadataBase{Type: metadata.LoanUnlockMeta},
 			}
 			copy(unlockMeta.LoanID, withdrawMeta.LoanID)
 			txNormals[0].Metadata = unlockMeta

@@ -26,6 +26,8 @@ const (
 	IssuingResponseMeta
 	ContractingRequestMeta
 	OracleFeedMeta
+	OracleRewardMeta
+	RefundMeta
 
 	//Voting
 	SubmitDCBProposalMeta
@@ -44,13 +46,16 @@ const (
 	SealedLv1DCBBallotMeta
 	SealedLv2DCBBallotMeta
 	SealedLv3DCBBallotMeta
-	NormalDCBBallotMetaFromSealer
-	NormalDCBBallotMetaFromOwner
+	NormalDCBBallotMetaFromSealerMeta
+	NormalDCBBallotMetaFromOwnerMeta
 	SealedLv1GOVBallotMeta
 	SealedLv2GOVBallotMeta
 	SealedLv3GOVBallotMeta
-	NormalGOVBallotMetaFromSealer
-	NormalGOVBallotMetaFromOwner
+	NormalGOVBallotMetaFromSealerMeta
+	NormalGOVBallotMetaFromOwnerMeta
+	RewardProposalMeta
+	PunishDCBDecryptMeta
+	PunishGOVDecryptMeta
 )
 
 const (

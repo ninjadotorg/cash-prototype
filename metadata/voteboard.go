@@ -11,9 +11,10 @@ type VoteDCBBoardMetadata struct {
 	MetadataBase
 }
 
-func NewVoteDCBBoardMetadata(voteDCBBoardMetadata map[string]interface{}) *VoteDCBBoardMetadata {
+func NewVoteDCBBoardMetadata(candidatePubKey []byte) *VoteDCBBoardMetadata {
 	return &VoteDCBBoardMetadata{
-		CandidatePubKey: voteDCBBoardMetadata["candidatePubKey"].([]byte),
+		CandidatePubKey: candidatePubKey,
+		MetadataBase:    *NewMetadataBase(VoteDCBBoardMeta),
 	}
 }
 
@@ -49,9 +50,10 @@ type VoteGOVBoardMetadata struct {
 	MetadataBase
 }
 
-func NewVoteGOVBoardMetadata(voteGOVBoardMetadata map[string]interface{}) *VoteGOVBoardMetadata {
+func NewVoteGOVBoardMetadata(candidatePubKey []byte) *VoteGOVBoardMetadata {
 	return &VoteGOVBoardMetadata{
-		CandidatePubKey: voteGOVBoardMetadata["candidatePubKey"].([]byte),
+		CandidatePubKey: candidatePubKey,
+		MetadataBase:    *NewMetadataBase(VoteGOVBoardMeta),
 	}
 }
 

@@ -1,10 +1,10 @@
 package rpcserver
 
 import (
-	"encoding/hex"
 	"encoding/json"
 
 	"github.com/ninjadotorg/constant/common"
+	"github.com/ninjadotorg/constant/common/base58"
 	"github.com/ninjadotorg/constant/metadata"
 	"github.com/ninjadotorg/constant/privacy-protocol"
 	"github.com/ninjadotorg/constant/rpcserver/jsonresult"
@@ -61,9 +61,9 @@ func (self RpcServer) handleCreateRawTxWithIssuingRequest(params interface{}, cl
 		Logger.log.Error(err)
 		return nil, NewRPCError(ErrUnexpected, err)
 	}
-	hexData := hex.EncodeToString(byteArrays)
 	result := jsonresult.CreateTransactionResult{
-		HexData: hexData,
+		TxID:            normalTx.Hash().String(),
+		Base58CheckData: base58.Base58Check{}.Encode(byteArrays, 0x00),
 	}
 	return result, nil
 }
@@ -74,12 +74,12 @@ func (self RpcServer) handleCreateAndSendTxWithIssuingRequest(params interface{}
 		return nil, err
 	}
 	tx := data.(jsonresult.CreateTransactionResult)
-	hexStrOfTx := tx.HexData
+	base58CheckData := tx.Base58CheckData
 	if err != nil {
 		return nil, NewRPCError(ErrUnexpected, err)
 	}
 	newParam := make([]interface{}, 0)
-	newParam = append(newParam, hexStrOfTx)
+	newParam = append(newParam, base58CheckData)
 	sendResult, err := self.handleSendRawTransaction(newParam, closeChan)
 	if err != nil {
 		return nil, NewRPCError(ErrUnexpected, err)
@@ -103,9 +103,9 @@ func (self RpcServer) handleCreateRawTxWithContractingRequest(params interface{}
 		Logger.log.Error(err)
 		return nil, NewRPCError(ErrUnexpected, err)
 	}
-	hexData := hex.EncodeToString(byteArrays)
 	result := jsonresult.CreateTransactionResult{
-		HexData: hexData,
+		TxID:            normalTx.Hash().String(),
+		Base58CheckData: base58.Base58Check{}.Encode(byteArrays, 0x00),
 	}
 	return result, nil
 }
@@ -116,12 +116,12 @@ func (self RpcServer) handleCreateAndSendTxWithContractingRequest(params interfa
 		return nil, err
 	}
 	tx := data.(jsonresult.CreateTransactionResult)
-	hexStrOfTx := tx.HexData
+	base58CheckData := tx.Base58CheckData
 	if err != nil {
 		return nil, NewRPCError(ErrUnexpected, err)
 	}
 	newParam := make([]interface{}, 0)
-	newParam = append(newParam, hexStrOfTx)
+	newParam = append(newParam, base58CheckData)
 	sendResult, err := self.handleSendRawTransaction(newParam, closeChan)
 	if err != nil {
 		return nil, NewRPCError(ErrUnexpected, err)
@@ -144,8 +144,8 @@ func (self RpcServer) buildRawSealLv3VoteDCBProposalTransaction(
 	Seal3Data := common.Encrypt(common.Encrypt(common.Encrypt(voteInfo, thirdPubKey), secondPubKey), firstPubKey)
 	tx.Metadata = metadata.NewSealedLv3DCBBallotMetadata(
 		map[string]interface{}{
-			"SealedBallot": []byte(Seal3Data.(string)),
-			"LockerPubKey": [][]byte{[]byte(firstPubKey.(string)), []byte(secondPubKey.(string)), []byte(thirdPubKey.(string))},
+			"SealedBallot":  []byte(Seal3Data.(string)),
+			"LockerPubKeys": [][]byte{[]byte(firstPubKey.(string)), []byte(secondPubKey.(string)), []byte(thirdPubKey.(string))},
 		})
 	return tx, err
 }
@@ -162,9 +162,9 @@ func (self RpcServer) handleCreateRawSealLv3VoteDCBProposalTransaction(params in
 		Logger.log.Error(err)
 		return nil, NewRPCError(ErrUnexpected, err)
 	}
-	hexData := hex.EncodeToString(byteArrays)
 	result := jsonresult.CreateTransactionResult{
-		HexData: hexData,
+		TxID:            tx.Hash().String(),
+		Base58CheckData: base58.Base58Check{}.Encode(byteArrays, 0x00),
 	}
 	return result, nil
 }
@@ -176,12 +176,12 @@ func (self RpcServer) handleCreateAndSendSealLv3VoteDCBProposalTransaction(param
 		return nil, err
 	}
 	tx := data.(jsonresult.CreateTransactionResult)
-	hexStrOfTx := tx.HexData
+	base58CheckData := tx.Base58CheckData
 	if err != nil {
 		return nil, err
 	}
 	newParam := make([]interface{}, 0)
-	newParam = append(newParam, hexStrOfTx)
+	newParam = append(newParam, base58CheckData)
 	txId, err := self.handleSendRawTransaction(newParam, closeChan)
 	return txId, err
 }
@@ -203,7 +203,7 @@ func (self RpcServer) buildRawSealLv2VoteDCBProposalTransaction(
 	tx.Metadata = metadata.NewSealedLv2DCBBallotMetadata(
 		map[string]interface{}{
 			"SealedBallot":       []byte(Seal2Data.(string)),
-			"LockerPubKey":       [][]byte{[]byte(firstPubKey.(string)), []byte(secondPubKey.(string)), []byte(thirdPubKey.(string))},
+			"LockerPubKeys":      [][]byte{[]byte(firstPubKey.(string)), []byte(secondPubKey.(string)), []byte(thirdPubKey.(string))},
 			"PointerToLv3Ballot": &Pointer,
 		},
 	)
@@ -222,9 +222,9 @@ func (self RpcServer) handleCreateRawSealLv2VoteDCBProposalTransaction(params in
 		Logger.log.Error(err)
 		return nil, NewRPCError(ErrUnexpected, err)
 	}
-	hexData := hex.EncodeToString(byteArrays)
 	result := jsonresult.CreateTransactionResult{
-		HexData: hexData,
+		TxID:            tx.Hash().String(),
+		Base58CheckData: base58.Base58Check{}.Encode(byteArrays, 0x00),
 	}
 	return result, nil
 }
@@ -236,12 +236,12 @@ func (self RpcServer) handleCreateAndSendSealLv2VoteDCBProposalTransaction(param
 		return nil, err
 	}
 	tx := data.(jsonresult.CreateTransactionResult)
-	hexStrOfTx := tx.HexData
+	base58CheckData := tx.Base58CheckData
 	if err != nil {
 		return nil, err
 	}
 	newParam := make([]interface{}, 0)
-	newParam = append(newParam, hexStrOfTx)
+	newParam = append(newParam, base58CheckData)
 	txId, err := self.handleSendRawTransaction(newParam, closeChan)
 	return txId, err
 }
@@ -269,7 +269,7 @@ func (self RpcServer) buildRawSealLv1VoteDCBProposalTransaction(
 	tx.Metadata = metadata.NewSealedLv1DCBBallotMetadata(
 		map[string]interface{}{
 			"SealedBallot":       []byte(Seal1Data.(string)),
-			"LockerPubKey":       [][]byte{[]byte(firstPubKey.(string)), []byte(secondPubKey.(string)), []byte(thirdPubKey.(string))},
+			"LockerPubKeys":      [][]byte{[]byte(firstPubKey.(string)), []byte(secondPubKey.(string)), []byte(thirdPubKey.(string))},
 			"PointerToLv2Ballot": &Pointer2,
 			"PointerToLv3Ballot": &Pointer3,
 		})
@@ -288,9 +288,9 @@ func (self RpcServer) handleCreateRawSealLv1VoteDCBProposalTransaction(params in
 		Logger.log.Error(err)
 		return nil, NewRPCError(ErrUnexpected, err)
 	}
-	hexData := hex.EncodeToString(byteArrays)
 	result := jsonresult.CreateTransactionResult{
-		HexData: hexData,
+		TxID:            tx.Hash().String(),
+		Base58CheckData: base58.Base58Check{}.Encode(byteArrays, 0x00),
 	}
 	return result, nil
 }
@@ -301,12 +301,12 @@ func (self RpcServer) handleCreateAndSendSealLv1VoteDCBProposalTransaction(param
 		return nil, err
 	}
 	tx := data.(jsonresult.CreateTransactionResult)
-	hexStrOfTx := tx.HexData
+	base58CheckData := tx.Base58CheckData
 	if err != nil {
 		return nil, err
 	}
 	newParam := make([]interface{}, 0)
-	newParam = append(newParam, hexStrOfTx)
+	newParam = append(newParam, base58CheckData)
 	txId, err := self.handleSendRawTransaction(newParam, closeChan)
 	return txId, err
 }
@@ -334,7 +334,7 @@ func (self RpcServer) buildRawNormalVoteDCBProposalTransactionFromSealer(
 	tx.Metadata = metadata.NewNormalDCBBallotFromSealerMetadata(
 		map[string]interface{}{
 			"Ballot":             normalBallot.([]byte),
-			"LockerPubKey":       [][]byte{firstPubKey.([]byte), secondPubKey.([]byte), thirdPubKey.([]byte)},
+			"LockerPubKeys":      [][]byte{firstPubKey.([]byte), secondPubKey.([]byte), thirdPubKey.([]byte)},
 			"PointerToLv1Ballot": &Pointer1,
 			"PointerToLv3Ballot": &Pointer3,
 		})
@@ -353,9 +353,9 @@ func (self RpcServer) handleCreateRawNormalVoteDCBProposalTransactionFromSealer(
 		Logger.log.Error(err)
 		return nil, NewRPCError(ErrUnexpected, err)
 	}
-	hexData := hex.EncodeToString(byteArrays)
 	result := jsonresult.CreateTransactionResult{
-		HexData: hexData,
+		TxID:            tx.Hash().String(),
+		Base58CheckData: base58.Base58Check{}.Encode(byteArrays, 0x00),
 	}
 	return result, nil
 }
@@ -366,12 +366,12 @@ func (self RpcServer) handleCreateAndSendNormalVoteDCBProposalTransactionFromSea
 		return nil, err
 	}
 	tx := data.(jsonresult.CreateTransactionResult)
-	hexStrOfTx := tx.HexData
+	base58CheckData := tx.Base58CheckData
 	if err != nil {
 		return nil, err
 	}
 	newParam := make([]interface{}, 0)
-	newParam = append(newParam, hexStrOfTx)
+	newParam = append(newParam, base58CheckData)
 	txId, err := self.handleSendRawTransaction(newParam, closeChan)
 	return txId, err
 }
@@ -391,7 +391,7 @@ func (self RpcServer) buildRawNormalVoteDCBProposalTransactionFromOwner(
 	tx.Metadata = metadata.NewNormalDCBBallotFromOwnerMetadata(
 		map[string]interface{}{
 			"Ballot":             normalBallot.([]byte),
-			"LockerPubKey":       [][]byte{[]byte(firstPubKey.(string)), []byte(secondPubKey.(string)), []byte(thirdPubKey.(string))},
+			"LockerPubKeys":      [][]byte{[]byte(firstPubKey.(string)), []byte(secondPubKey.(string)), []byte(thirdPubKey.(string))},
 			"PointerToLv3Ballot": &Pointer,
 		})
 	return tx, err
@@ -409,9 +409,9 @@ func (self RpcServer) handleCreateRawNormalVoteDCBProposalTransactionFromOwner(p
 		Logger.log.Error(err)
 		return nil, NewRPCError(ErrUnexpected, err)
 	}
-	hexData := hex.EncodeToString(byteArrays)
 	result := jsonresult.CreateTransactionResult{
-		HexData: hexData,
+		TxID:            tx.Hash().String(),
+		Base58CheckData: base58.Base58Check{}.Encode(byteArrays, 0x00),
 	}
 	return result, nil
 }
@@ -422,12 +422,12 @@ func (self RpcServer) handleCreateAndSendNormalVoteDCBProposalTransactionFromOwn
 		return nil, err
 	}
 	tx := data.(jsonresult.CreateTransactionResult)
-	hexStrOfTx := tx.HexData
+	base58CheckData := tx.Base58CheckData
 	if err != nil {
 		return nil, err
 	}
 	newParam := make([]interface{}, 0)
-	newParam = append(newParam, hexStrOfTx)
+	newParam = append(newParam, base58CheckData)
 	txId, err := self.handleSendRawTransaction(newParam, closeChan)
 	return txId, err
 }
@@ -439,17 +439,15 @@ func (self RpcServer) buildRawVoteDCBBoardTransaction(
 	tx, err := self.buildRawCustomTokenTransaction(params)
 	candidatePaymentAddress := arrayParams[len(arrayParams)-1].(string)
 	account, _ := wallet.Base58CheckDeserialize(candidatePaymentAddress)
-	tx.Metadata = &metadata.VoteDCBBoardMetadata{
-		CandidatePubKey: account.KeySet.PaymentAddress.Pk,
-	}
+	tx.Metadata = &metadata.NewVoteDCBBoardMetadata(account.KeySet.PaymentAddress.Pk)
 	return tx, err
 }
 
 func (self RpcServer) handleSendRawVoteBoardDCBTransaction(params interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	Logger.log.Info(params)
 	arrayParams := common.InterfaceSlice(params)
-	hexRawTx := arrayParams[0].(string)
-	rawTxBytes, err := hex.DecodeString(hexRawTx)
+	base58CheckDate := arrayParams[0].(string)
+	rawTxBytes, _, err := base58.Base58Check{}.Decode(base58CheckDate)
 
 	if err != nil {
 		return nil, err
@@ -496,9 +494,9 @@ func (self RpcServer) handleCreateRawVoteDCBBoardTransaction(
 		Logger.log.Error(err)
 		return nil, NewRPCError(ErrUnexpected, err)
 	}
-	hexData := hex.EncodeToString(byteArrays)
 	result := jsonresult.CreateTransactionResult{
-		HexData: hexData,
+		TxID:            tx.Hash().String(),
+		Base58CheckData: base58.Base58Check{}.Encode(byteArrays, 0x00),
 	}
 	return result, nil
 }
@@ -509,12 +507,12 @@ func (self RpcServer) handleCreateAndSendVoteDCBBoardTransaction(params interfac
 		return nil, err
 	}
 	tx := data.(jsonresult.CreateTransactionResult)
-	hexStrOfTx := tx.HexData
+	base58CheckData := tx.Base58CheckData
 	if err != nil {
 		return nil, err
 	}
 	newParam := make([]interface{}, 0)
-	newParam = append(newParam, hexStrOfTx)
+	newParam = append(newParam, base58CheckData)
 	txId, err := self.handleSendRawVoteBoardDCBTransaction(newParam, closeChan)
 	return txId, err
 }
@@ -544,9 +542,9 @@ func (self RpcServer) handleCreateRawSubmitDCBProposalTransaction(
 		Logger.log.Error(err)
 		return nil, NewRPCError(ErrUnexpected, err)
 	}
-	hexData := hex.EncodeToString(byteArrays)
 	result := jsonresult.CreateTransactionResult{
-		HexData: hexData,
+		TxID:            tx.Hash().String(),
+		Base58CheckData: base58.Base58Check{}.Encode(byteArrays, 0x00),
 	}
 	return result, nil
 }
@@ -554,8 +552,8 @@ func (self RpcServer) handleCreateRawSubmitDCBProposalTransaction(
 func (self RpcServer) handleSendRawSubmitDCBProposalTransaction(params interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	Logger.log.Info(params)
 	arrayParams := common.InterfaceSlice(params)
-	hexRawTx := arrayParams[0].(string)
-	rawTxBytes, err := hex.DecodeString(hexRawTx)
+	base58CheckDate := arrayParams[0].(string)
+	rawTxBytes, _, err := base58.Base58Check{}.Decode(base58CheckDate)
 
 	if err != nil {
 		return nil, err
@@ -593,12 +591,12 @@ func (self RpcServer) handleCreateAndSendSubmitDCBProposalTransaction(params int
 		return nil, err
 	}
 	tx := data.(jsonresult.CreateTransactionResult)
-	hexStrOfTx := tx.HexData
+	base58CheckData := tx.Base58CheckData
 	if err != nil {
 		return nil, err
 	}
 	newParam := make([]interface{}, 0)
-	newParam = append(newParam, hexStrOfTx)
+	newParam = append(newParam, base58CheckData)
 	txId, err := self.handleSendRawSubmitDCBProposalTransaction(newParam, closeChan)
 	return txId, err
 }

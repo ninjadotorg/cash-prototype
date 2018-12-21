@@ -3,17 +3,20 @@ package metadata
 import (
 	"github.com/ninjadotorg/constant/common"
 	"github.com/ninjadotorg/constant/database"
+	"github.com/ninjadotorg/constant/voting"
 )
 
 type AcceptDCBProposalMetadata struct {
 	DCBProposalTXID common.Hash
-
+	Voter           voting.Voter
 	MetadataBase
 }
 
-func NewAcceptDCBProposalMetadata(voteDCBBoardMetadata map[string]interface{}) *AcceptDCBProposalMetadata {
+func NewAcceptDCBProposalMetadata(DCBProposalTXID common.Hash, voter voting.Voter) *AcceptDCBProposalMetadata {
 	return &AcceptDCBProposalMetadata{
-		DCBProposalTXID: voteDCBBoardMetadata["DCBProposalTXID"].(common.Hash),
+		DCBProposalTXID: DCBProposalTXID,
+		Voter:           voter,
+		MetadataBase:    *NewMetadataBase(AcceptDCBProposalMeta),
 	}
 }
 
@@ -30,6 +33,7 @@ func (acceptDCBProposalMetadata *AcceptDCBProposalMetadata) ValidateTxWithBlockC
 
 func (acceptDCBProposalMetadata *AcceptDCBProposalMetadata) Hash() *common.Hash {
 	record := string(common.ToBytes(acceptDCBProposalMetadata.DCBProposalTXID))
+	record += string(*voting.Voter.Hash())
 	record += string(acceptDCBProposalMetadata.MetadataBase.Hash()[:])
 	hash := common.DoubleHashH([]byte(record))
 	return &hash
@@ -45,13 +49,15 @@ func (acceptDCBProposalMetadata *AcceptDCBProposalMetadata) ValidateMetadataByIt
 
 type AcceptGOVProposalMetadata struct {
 	GOVProposalTXID common.Hash
-
+	Voter           voting.Voter
 	MetadataBase
 }
 
-func NewAcceptGOVProposalMetadata(voteGOVBoardMetadata map[string]interface{}) *AcceptGOVProposalMetadata {
+func NewAcceptGOVProposalMetadata(GOVProposalTXID common.Hash, voter voting.Voter) *AcceptGOVProposalMetadata {
 	return &AcceptGOVProposalMetadata{
-		GOVProposalTXID: voteGOVBoardMetadata["GOVProposalTXID"].(common.Hash),
+		GOVProposalTXID: GOVProposalTXID,
+		Voter:           voter,
+		MetadataBase:    *NewMetadataBase(AcceptGOVProposalMeta),
 	}
 }
 

@@ -5,6 +5,7 @@ import (
 	"github.com/ninjadotorg/constant/common"
 	"github.com/ninjadotorg/constant/metadata"
 	"github.com/ninjadotorg/constant/transaction"
+	"github.com/ninjadotorg/constant/voting"
 )
 
 type ConstitutionInfo struct {
@@ -84,20 +85,16 @@ func (GOVConstitutionHelper) GetAmountVoteToken(tx metadata.Transaction) uint64 
 	return tx.(*transaction.TxCustomToken).GetAmountOfVote()
 }
 
-func (DCBConstitutionHelper) TxAcceptProposal(txId *common.Hash) metadata.Transaction {
+func (DCBConstitutionHelper) TxAcceptProposal(txId *common.Hash, voter voting.Voter) metadata.Transaction {
 	acceptTx := transaction.Tx{
-		Metadata: &metadata.AcceptDCBProposalMetadata{
-			DCBProposalTXID: *txId,
-		},
+		Metadata: metadata.NewAcceptDCBProposalMetadata(*txId, voter),
 	}
 	return &acceptTx
 }
 
-func (GOVConstitutionHelper) TxAcceptProposal(txId *common.Hash) metadata.Transaction {
+func (GOVConstitutionHelper) TxAcceptProposal(txId *common.Hash, voter voting.Voter) metadata.Transaction {
 	acceptTx := transaction.Tx{
-		Metadata: &metadata.AcceptGOVProposalMetadata{
-			GOVProposalTXID: *txId,
-		},
+		Metadata: metadata.NewAcceptGOVProposalMetadata(*txId, voter),
 	}
 	return &acceptTx
 }
@@ -120,7 +117,7 @@ func (GOVConstitutionHelper) CreatePunishDecryptTx(data map[string]interface{}) 
 
 func (DCBConstitutionHelper) GetSealerPubKey(tx metadata.Transaction) [][]byte {
 	meta := tx.GetMetadata().(*metadata.SealedLv3DCBBallotMetadata)
-	return meta.LockerPubKey
+	return meta.LockerPubKeys
 }
 
 func (GOVConstitutionHelper) GetSealerPubKey(tx metadata.Transaction) [][]byte {

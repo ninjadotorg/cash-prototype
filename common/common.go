@@ -362,3 +362,8 @@ func Uint32ToBytes(value uint32) []byte {
 func BytesToUint32(b []byte) uint32 {
 	return binary.LittleEndian.Uint32(b)
 }
+
+func BytesToInt32(b []byte) int32 {
+	i, _ := strconv.Atoi(string(b))
+	return int32(i)
+}
