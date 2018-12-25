@@ -44,6 +44,7 @@ const (
 	NumberOfDCBGovernors              = 50
 	NumberOfGOVGovernors              = 50
 	EncryptionPhaseDuration           = uint32(5)
+	RewardProposalSubmitter           = 500
 )
 
 // board types
@@ -58,9 +59,7 @@ var (
 	DCBTokenID      = [HashSize]byte{1}
 	GOVTokenID      = [HashSize]byte{2}
 	CMBTokenID      = [HashSize]byte{3}
-	ConstantID      = [HashSize]byte{4} // To send Constant in custom token
-	VoteDCBTokenID  = [HashSize]byte{5}
-	VoteGOVTokenID  = [HashSize]byte{6}
+	ConstantID      = [HashSize]byte{4}                      // To send Constant in custom token
 	OffchainAssetID = [HashSize]byte{7, 7, 7, 7, 7, 7, 7, 7} // First 8 bytes of offchain asset
 )
 
@@ -74,6 +73,5 @@ var (
 const (
 	DCBAddress     = "1Uv3jP4ixNx3BkEtmUUxKXA1TXUduix3KMCWXHvLqVyA9CFfoLRZ949zTBNqDUPSzaPCZPrQKSfiEHguFazK6VeDmEk1RMLfX1kQiSqJ6"
 	GOVAddress     = "1Uv3jP4ixNx3BkEtmUUxKXA1TXUduix3KMCWXHvLqVyA9CFfoLRZ949zTBNqDUPSzaPCZPrQKSfiEHguFazK6VeDmEk1RMLfX1kQiSqJ6"
-	VoteAddress    = ""
 	BurningAddress = ""
 )
