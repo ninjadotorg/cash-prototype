@@ -81,7 +81,7 @@ var RpcHandler = map[string]commandHandler{
 	GetListCBBoard:                 RpcServer.handleGetListCBBoard,
 	GetListGOVBoard:                RpcServer.handleGetListGOVBoard,
 
-	// vote
+	// vote board
 	CreateAndSendVoteDCBBoardTransaction: RpcServer.handleCreateAndSendVoteDCBBoardTransaction,
 	CreateRawVoteDCBBoardTx:              RpcServer.handleCreateRawVoteDCBBoardTransaction,
 	SendRawVoteBoardDCBTx:                RpcServer.handleSendRawVoteBoardDCBTransaction,

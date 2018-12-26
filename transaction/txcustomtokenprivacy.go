@@ -1,12 +1,13 @@
 package transaction
 
 import (
+	"errors"
+
 	"github.com/ninjadotorg/constant/common"
 	"github.com/ninjadotorg/constant/database"
-	"github.com/ninjadotorg/constant/privacy-protocol"
-	"errors"
-	"github.com/ninjadotorg/constant/privacy-protocol/zero-knowledge"
 	"github.com/ninjadotorg/constant/metadata"
+	"github.com/ninjadotorg/constant/privacy-protocol"
+	"github.com/ninjadotorg/constant/privacy-protocol/zero-knowledge"
 )
 
 // TxCustomTokenPrivacy is class tx which is inherited from constant tx(supporting privacy) for fee
@@ -66,7 +67,7 @@ func (txCustomToken *TxCustomTokenPrivacy) Init(senderKey *privacy.SpendingKey,
 	tokenParams *CustomTokenPrivacyParamTx,
 	listCustomTokens map[common.Hash]TxCustomTokenPrivacy,
 	db database.DatabaseInterface,
-) (error) {
+) error {
 
 	// init data for tx constant for fee
 	normalTx := Tx{}

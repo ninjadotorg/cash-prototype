@@ -117,14 +117,17 @@ type DatabaseInterface interface {
 	GetThreePhraseSealerPrefix() []byte
 	GetThreePhraseOwnerPrefix() []byte
 	GetThreePhraseVoteValuePrefix() []byte
-	SendInitDCBVoteToken(uint32, []byte, uint64) error
-	SendInitGOVVoteToken(uint32, []byte, uint64) error
+	SendInitDCBVoteToken(uint32, []byte, uint32) error
+	SendInitGOVVoteToken(uint32, []byte, uint32) error
 	AddVoteLv3Proposal(string, uint32, *common.Hash) error
 	AddVoteLv1or2Proposal(string, uint32, *common.Hash) error
 	AddVoteNormalProposalFromOwner(string, uint32, *common.Hash, []byte) error
 	AddVoteNormalProposalFromSealer(string, uint32, *common.Hash, []byte) error
-	GetAmountVoteToken(string, []byte) uint32
-	TakeVoteTokenFromWinner(string, voting.Voter)
+	GetAmountVoteToken(string, uint32, []byte) (uint32, error)
+	TakeVoteTokenFromWinner(string, uint32, voting.Voter) error
+	SetNewWinningVoter(string, uint32, []byte) error
+	GetDCBVoteTokenAmount(startedBlock uint32, pubKey []byte) uint32
+	GetGOVVoteTokenAmount(startedBlock uint32, pubKey []byte) uint32
 
 	Close() error
 }

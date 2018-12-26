@@ -4,30 +4,34 @@ import (
 	"github.com/ninjadotorg/constant/blockchain/params"
 	"github.com/ninjadotorg/constant/common"
 	"github.com/ninjadotorg/constant/database"
+	"github.com/ninjadotorg/constant/privacy-protocol"
 )
 
 type SubmitDCBProposalMetadata struct {
 	DCBParams       params.DCBParams
 	ExecuteDuration uint32
 	Explanation     string
+	PaymentAddress  privacy.PaymentAddress
 
 	MetadataBase
 }
 
-func NewSubmitDCBProposalMetadata(DCBParams params.DCBParams, executeDuration uint32, explanation string) *SubmitDCBProposalMetadata {
+func NewSubmitDCBProposalMetadata(DCBParams params.DCBParams, executeDuration uint32, explanation string, address *privacy.PaymentAddress) *SubmitDCBProposalMetadata {
 	return &SubmitDCBProposalMetadata{
 		DCBParams:       DCBParams,
 		ExecuteDuration: executeDuration,
 		Explanation:     explanation,
+		PaymentAddress:  *address,
 		MetadataBase:    *NewMetadataBase(SubmitDCBProposalMeta),
 	}
 }
 
 func (submitDCBProposalMetadata *SubmitDCBProposalMetadata) Hash() *common.Hash {
-	record := string(common.ToBytes(*submitDCBProposalMetadata.DCBParams.Hash()))
+	record := string(submitDCBProposalMetadata.DCBParams.Hash().GetBytes())
 	record += string(submitDCBProposalMetadata.ExecuteDuration)
 	record += submitDCBProposalMetadata.Explanation
-	record += string(submitDCBProposalMetadata.MetadataBase.Hash()[:])
+	record += string(submitDCBProposalMetadata.PaymentAddress.ToBytes())
+	record += string(submitDCBProposalMetadata.MetadataBase.Hash().GetBytes())
 	hash := common.DoubleHashH([]byte(record))
 	return &hash
 }
@@ -57,25 +61,28 @@ func (submitDCBProposalMetadata *SubmitDCBProposalMetadata) ValidateMetadataByIt
 type SubmitGOVProposalMetadata struct {
 	GOVParams       params.GOVParams
 	ExecuteDuration uint32
-	Explaination    string
+	Explanation     string
+	PaymentAddress  privacy.PaymentAddress
 
 	MetadataBase
 }
 
-func NewSubmitGOVProposalMetadata(GOVParams params.GOVParams, executeDuration uint32, explaination string) *SubmitGOVProposalMetadata {
+func NewSubmitGOVProposalMetadata(GOVParams params.GOVParams, executeDuration uint32, explaination string, address *privacy.PaymentAddress) *SubmitGOVProposalMetadata {
 	return &SubmitGOVProposalMetadata{
 		GOVParams:       GOVParams,
 		ExecuteDuration: executeDuration,
-		Explaination:    explaination,
+		Explanation:     explaination,
+		PaymentAddress:  *address,
 		MetadataBase:    *NewMetadataBase(SubmitGOVProposalMeta),
 	}
 }
 
 func (submitGOVProposalMetadata *SubmitGOVProposalMetadata) Hash() *common.Hash {
-	record := string(common.ToBytes(*submitGOVProposalMetadata.GOVParams.Hash()))
+	record := string(submitGOVProposalMetadata.GOVParams.Hash().GetBytes())
 	record += string(submitGOVProposalMetadata.ExecuteDuration)
-	record += submitGOVProposalMetadata.Explaination
-	record += string(submitGOVProposalMetadata.MetadataBase.Hash()[:])
+	record += submitGOVProposalMetadata.Explanation
+	record += string(submitGOVProposalMetadata.PaymentAddress.ToBytes())
+	record += string(submitGOVProposalMetadata.MetadataBase.Hash().GetBytes())
 	hash := common.DoubleHashH([]byte(record))
 	return &hash
 }
@@ -92,7 +99,7 @@ func (submitGOVProposalMetadata *SubmitGOVProposalMetadata) ValidateSanityData(B
 		submitGOVProposalMetadata.ExecuteDuration > common.MaximumBlockOfProposalDuration {
 		return true, false, nil
 	}
-	if len(submitGOVProposalMetadata.Explaination) > common.MaximumProposalExplainationLength {
+	if len(submitGOVProposalMetadata.Explanation) > common.MaximumProposalExplainationLength {
 		return true, false, nil
 	}
 	return true, true, nil

@@ -32,9 +32,9 @@ func (acceptDCBProposalMetadata *AcceptDCBProposalMetadata) ValidateTxWithBlockC
 }
 
 func (acceptDCBProposalMetadata *AcceptDCBProposalMetadata) Hash() *common.Hash {
-	record := string(common.ToBytes(acceptDCBProposalMetadata.DCBProposalTXID))
-	record += string(*voting.Voter.Hash())
-	record += string(acceptDCBProposalMetadata.MetadataBase.Hash()[:])
+	record := string(acceptDCBProposalMetadata.DCBProposalTXID.GetBytes())
+	record += string(acceptDCBProposalMetadata.Voter.Hash().GetBytes())
+	record += string(acceptDCBProposalMetadata.MetadataBase.Hash().GetBytes())
 	hash := common.DoubleHashH([]byte(record))
 	return &hash
 }
@@ -77,8 +77,9 @@ func (acceptGOVProposalMetadata *AcceptGOVProposalMetadata) GetType() int {
 }
 
 func (acceptGOVProposalMetadata *AcceptGOVProposalMetadata) Hash() *common.Hash {
-	record := string(common.ToBytes(acceptGOVProposalMetadata.GOVProposalTXID))
-	record += string(acceptGOVProposalMetadata.MetadataBase.Hash()[:])
+	record := string(acceptGOVProposalMetadata.GOVProposalTXID.GetBytes())
+	record += string(acceptGOVProposalMetadata.Hash().GetBytes())
+	record += string(acceptGOVProposalMetadata.MetadataBase.Hash().GetBytes())
 	hash := common.DoubleHashH([]byte(record))
 	return &hash
 }

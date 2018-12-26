@@ -6,6 +6,7 @@ import (
 
 	"github.com/ninjadotorg/constant/common"
 	"github.com/ninjadotorg/constant/database"
+	"github.com/ninjadotorg/constant/voting"
 	"github.com/pkg/errors"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
 	"github.com/syndtr/goleveldb/leveldb/opt"
@@ -325,6 +326,17 @@ func GetDCBVoteTokenAmountKey(startedBlock uint32, pubKey []byte) []byte {
 	return key
 }
 
+func (db *db) GetDCBVoteTokenAmount(startedBlock uint32, pubKey []byte) uint32 {
+	key := GetDCBVoteTokenAmountKey(startedBlock, pubKey)
+	value, _ := db.Get(key)
+	return common.BytesToUint32(value)
+}
+func (db *db) GetGOVVoteTokenAmount(startedBlock uint32, pubKey []byte) uint32 {
+	key := GetGOVVoteTokenAmountKey(startedBlock, pubKey)
+	value, _ := db.Get(key)
+	return common.BytesToUint32(value)
+}
+
 func GetVoteGOVBoardSumKey(startedBlock uint32, candidatePubKey []byte) []byte {
 	key := append(voteGOVBoardSumPrefix, common.Uint32ToBytes(startedBlock)...)
 	key = append(key, candidatePubKey...)
@@ -406,6 +418,12 @@ func GetThreePhraseVoteValueKey(boardType string, startedBlock uint32, txId *com
 	return key
 }
 
+func GetWinningVoterKey(boardType string, startedBlock uint32) []byte {
+	key := append(winningVoterPrefix, []byte(boardType)...)
+	key = append(key, common.Uint32ToBytes(startedBlock)...)
+	return key
+}
+
 func ParseKeyThreePhraseVoteValue(key []byte) (string, uint32, *common.Hash, error) {
 	realKey := key[len(threePhraseVoteValuePrefix):]
 	boardType := realKey[:3]
@@ -418,4 +436,53 @@ func ParseValueThreePhraseVoteValue(value []byte) (*common.Hash, int32, error) {
 	txId := common.NewHash(value[:common.HashSize])
 	amount := common.BytesToInt32(value[common.HashSize:])
 	return &txId, amount, nil
+}
+
+func (db *db) GetAmountVoteToken(boardType string, startedBlock uint32, pubKey []byte) (uint32, error) {
+	key := make([]byte, 0)
+	if boardType == "dcb" {
+		key = GetDCBVoteTokenAmountKey(startedBlock, pubKey)
+	} else if boardType == "gov" {
+		key = GetGOVVoteTokenAmountKey(startedBlock, pubKey)
+	} else {
+		return 0, errors.New("wrong board type")
+	}
+	currentAmountInBytes, err := db.lvdb.Get(key, nil)
+	if err != nil {
+		return 0, err
+	}
+	currentAmount := common.BytesToUint32(currentAmountInBytes)
+	return currentAmount, nil
+}
+
+func (db *db) TakeVoteTokenFromWinner(boardType string, startedBlock uint32, voter voting.Voter) error {
+	key := make([]byte, 0)
+	if boardType == "dcb" {
+		key = GetDCBVoteTokenAmountKey(startedBlock, voter.PubKey)
+	} else if boardType == "gov" {
+		key = GetGOVVoteTokenAmountKey(startedBlock, voter.PubKey)
+	} else {
+		return errors.New("wrong board type")
+	}
+	currentAmountInByte, err := db.Get(key)
+	if err != nil {
+		return err
+	}
+	currentAmount := common.BytesToUint32(currentAmountInByte)
+	newAmount := currentAmount - uint32(voter.AmountOfVote)
+	db.Put(key, common.Uint32ToBytes(newAmount))
+	return nil
+}
+
+func (db *db) SetNewWinningVoter(boardType string, startedBlock uint32, voterPubKey []byte) error {
+	key := make([]byte, 0)
+	if boardType == "dcb" {
+		key = GetWinningVoterKey(boardType, startedBlock)
+	} else if boardType == "gov" {
+		key = GetWinningVoterKey(boardType, startedBlock)
+	} else {
+		return errors.New("wrong board type")
+	}
+	db.Put(key, voterPubKey)
+	return nil
 }

@@ -6,13 +6,13 @@ import (
 )
 
 type SendInitDCBVoteTokenMetadata struct {
-	Amount         uint64
+	Amount         uint32
 	ReceiverPubKey []byte
 
 	MetadataBase
 }
 
-func NewSendInitDCBVoteTokenMetadata(amount uint64, receiverPubKey []byte) *SendInitDCBVoteTokenMetadata {
+func NewSendInitDCBVoteTokenMetadata(amount uint32, receiverPubKey []byte) *SendInitDCBVoteTokenMetadata {
 	return &SendInitDCBVoteTokenMetadata{
 		Amount:         amount,
 		ReceiverPubKey: receiverPubKey,
@@ -24,7 +24,7 @@ func NewSendInitDCBVoteTokenMetadata(amount uint64, receiverPubKey []byte) *Send
 func (sendInitDCBVoteTokenMetadata *SendInitDCBVoteTokenMetadata) Hash() *common.Hash {
 	record := string(sendInitDCBVoteTokenMetadata.Amount)
 	record += string(sendInitDCBVoteTokenMetadata.ReceiverPubKey)
-	record += string(sendInitDCBVoteTokenMetadata.MetadataBase.Hash()[:])
+	record += string(sendInitDCBVoteTokenMetadata.MetadataBase.Hash().GetBytes())
 	hash := common.DoubleHashH([]byte(record))
 	return &hash
 }
@@ -45,13 +45,13 @@ func (sendInitDCBVoteTokenMetadata *SendInitDCBVoteTokenMetadata) ValidateMetada
 }
 
 type SendInitGOVVoteTokenMetadata struct {
-	Amount         uint64
+	Amount         uint32
 	ReceiverPubKey []byte
 
 	MetadataBase
 }
 
-func NewSendInitGOVVoteTokenMetadata(amount uint64, receiverPubKey []byte) *SendInitGOVVoteTokenMetadata {
+func NewSendInitGOVVoteTokenMetadata(amount uint32, receiverPubKey []byte) *SendInitGOVVoteTokenMetadata {
 	return &SendInitGOVVoteTokenMetadata{
 		Amount:         amount,
 		ReceiverPubKey: receiverPubKey,
@@ -63,7 +63,7 @@ func NewSendInitGOVVoteTokenMetadata(amount uint64, receiverPubKey []byte) *Send
 func (sendInitGOVVoteTokenMetadata *SendInitGOVVoteTokenMetadata) Hash() *common.Hash {
 	record := string(sendInitGOVVoteTokenMetadata.Amount)
 	record += string(sendInitGOVVoteTokenMetadata.ReceiverPubKey)
-	record += string(sendInitGOVVoteTokenMetadata.MetadataBase.Hash()[:])
+	record += string(sendInitGOVVoteTokenMetadata.MetadataBase.Hash().GetBytes())
 	hash := common.DoubleHashH([]byte(record))
 	return &hash
 }

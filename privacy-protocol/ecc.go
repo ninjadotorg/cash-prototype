@@ -6,9 +6,10 @@ import (
 
 	"github.com/ninjadotorg/constant/common"
 
-	"github.com/pkg/errors"
 	"encoding/json"
+
 	"github.com/ninjadotorg/constant/common/base58"
+	"github.com/pkg/errors"
 )
 
 // Curve P256
@@ -41,7 +42,7 @@ type EllipticPoint struct {
 }
 
 // Zero initializes elliptic point with X = 0, Y = 0
-func (self *EllipticPoint) Zero() *EllipticPoint{
+func (self *EllipticPoint) Zero() *EllipticPoint {
 	self.X = new(big.Int).SetInt64(0)
 	self.Y = new(big.Int).SetInt64(0)
 	return self

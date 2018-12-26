@@ -53,7 +53,9 @@ const (
 	SealedLv3GOVBallotMeta
 	NormalGOVBallotMetaFromSealerMeta
 	NormalGOVBallotMetaFromOwnerMeta
-	RewardProposalMeta
+	RewardProposalWinnerMeta
+	RewardDCBProposalSubmitterMeta
+	RewardGOVProposalSubmitterMeta
 	PunishDCBDecryptMeta
 	PunishGOVDecryptMeta
 )
