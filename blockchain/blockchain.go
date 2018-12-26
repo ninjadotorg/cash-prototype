@@ -2,7 +2,6 @@ package blockchain
 
 import (
 	"bytes"
-	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -19,7 +18,7 @@ import (
 	"github.com/ninjadotorg/constant/database"
 	"github.com/ninjadotorg/constant/database/lvdb"
 	"github.com/ninjadotorg/constant/metadata"
-	"github.com/ninjadotorg/constant/privacy-protocol"
+	"github.com/ninjadotorg/constant/privacy"
 	"github.com/ninjadotorg/constant/transaction"
 	"github.com/ninjadotorg/constant/voting"
 	"github.com/ninjadotorg/constant/wallet"
@@ -63,10 +62,12 @@ type Config struct {
 	// This field is required.
 	ChainParams *Params
 
-	//Light mode flag
-	Light bool
+	//LightMode mode flag
+	LightMode bool
+
 	//Wallet for light mode
 	Wallet *wallet.Wallet
+
 	//snapshot reward
 	customTokenRewardSnapshot map[string]uint64
 }
@@ -232,11 +233,6 @@ func (self *BlockChain) createChainState(chainId byte) error {
 	}
 	initBlock.Header.Height = 1
 
-	/*tree := new(client.IncMerkleTree) // Build genesis block commitment merkle tree
-	if err := UpdateMerkleTreeForBlock(tree, initBlock); err != nil {
-		return NewBlockChainError(UpdateMerkleTreeForBlockError, err)
-	}*/
-
 	self.BestState[chainId] = &BestState{}
 	self.BestState[chainId].Init(initBlock /*, tree*/)
 
@@ -284,13 +280,16 @@ func (self *BlockChain) GetBlockByBlockHeight(height int32, chainId byte) (*Bloc
 
 	block := Block{}
 	blockHeader := BlockHeader{}
-	if self.config.Light {
-		// with light node, we can only get data of header of block
-		err = json.Unmarshal(blockBytes, &blockHeader)
+	if self.config.LightMode {
+		err = json.Unmarshal(blockBytes, &block)
 		if err != nil {
-			return nil, err
+			// with light node, block data can only contain block header
+			err = json.Unmarshal(blockBytes, &blockHeader)
+			if err != nil {
+				return nil, err
+			}
+			block.Header = blockHeader
 		}
-		block.Header = blockHeader
 	} else {
 		err = json.Unmarshal(blockBytes, &block)
 		if err != nil {
@@ -310,13 +309,16 @@ func (self *BlockChain) GetBlockByBlockHash(hash *common.Hash) (*Block, error) {
 	}
 	block := Block{}
 	blockHeader := BlockHeader{}
-	if self.config.Light {
-		// with light node, we can only get data of header of block
-		err = json.Unmarshal(blockBytes, &blockHeader)
+	if self.config.LightMode {
+		err = json.Unmarshal(blockBytes, &block)
 		if err != nil {
-			return nil, err
+			// with light node, block data can only contain block header
+			err = json.Unmarshal(blockBytes, &blockHeader)
+			if err != nil {
+				return nil, err
+			}
+			block.Header = blockHeader
 		}
-		block.Header = blockHeader
 	} else {
 		err = json.Unmarshal(blockBytes, &block)
 		if err != nil {
@@ -362,17 +364,6 @@ func (self *BlockChain) StoreBlockHeader(block *Block) error {
 }
 
 /*
-	Store Transaction in Light mode
-*/
-func (self *BlockChain) StoreUnspentTransactionLightMode(privatKey *privacy.SpendingKey, chainId byte, blockHeight int32, txIndex int, tx *transaction.Tx) error {
-	txJsonBytes, err := json.Marshal(tx)
-	if err != nil {
-		return NewBlockChainError(UnExpectedError, errors.New("json.Marshal"))
-	}
-	return self.config.DataBase.StoreTransactionLightMode(privatKey, chainId, blockHeight, txIndex, *(tx.Hash()), txJsonBytes)
-}
-
-/*
 Save index(height) of block by block hash
 and
 Save block hash by index(height) of block
@@ -386,7 +377,7 @@ func (self *BlockChain) StoreTransactionIndex(txHash *common.Hash, blockHash *co
 }
 
 /*
-Uses an existing database to update the set of used tx by saving list nullifier of privacy-protocol,
+Uses an existing database to update the set of used tx by saving list nullifier of privacy,
 this is a list tx-out which are used by a new tx
 */
 func (self *BlockChain) StoreSerialNumbersFromTxViewPoint(view TxViewPoint) error {
@@ -400,7 +391,7 @@ func (self *BlockChain) StoreSerialNumbersFromTxViewPoint(view TxViewPoint) erro
 }
 
 /*
-Uses an existing database to update the set of used tx by saving list SNDerivator of privacy-protocol,
+Uses an existing database to update the set of used tx by saving list SNDerivator of privacy,
 this is a list tx-out which are used by a new tx
 */
 func (self *BlockChain) StoreSNDerivatorsFromTxViewPoint(view TxViewPoint) error {
@@ -415,7 +406,7 @@ func (self *BlockChain) StoreSNDerivatorsFromTxViewPoint(view TxViewPoint) error
 }
 
 /*
-Uses an existing database to update the set of not used tx by saving list commitments of privacy-protocol,
+Uses an existing database to update the set of not used tx by saving list commitments of privacy,
 this is a list tx-in which are used by a new tx
 */
 func (self *BlockChain) StoreCommitmentsFromTxViewPoint(view TxViewPoint) error {
@@ -449,7 +440,7 @@ func (self *BlockChain) StoreCommitmentsFromTxViewPoint(view TxViewPoint) error 
 }
 
 /*
-Uses an existing database to update the set of used tx by saving list nullifier of privacy-protocol,
+Uses an existing database to update the set of used tx by saving list nullifier of privacy,
 this is a list tx-out which are used by a new tx
 */
 /*func (self *BlockChain) StoreNullifiersFromListNullifier(nullifiers [][]byte, chainId byte) error {
@@ -463,7 +454,7 @@ this is a list tx-out which are used by a new tx
 }*/
 
 /*
-Uses an existing database to update the set of used tx by saving list nullifier of privacy-protocol,
+Uses an existing database to update the set of used tx by saving list nullifier of privacy,
 this is a list tx-out which are used by a new tx
 */
 /*func (self *BlockChain) StoreNullifiersFromTx(tx *transaction.Tx) error {
@@ -499,7 +490,7 @@ func (self *BlockChain) GetAllBlocks() ([][]*Block, error) {
 			}
 			block := Block{}
 			blockHeader := BlockHeader{}
-			if self.config.Light {
+			if self.config.LightMode {
 				// with light node, we can only get data of header of block
 				err = json.Unmarshal(blockBytes, &blockHeader)
 				if err != nil {
@@ -533,13 +524,16 @@ func (self *BlockChain) GetChainBlocks(chainID byte) ([]*Block, error) {
 		}
 		block := Block{}
 		blockHeader := BlockHeader{}
-		if self.config.Light {
-			// with light node, we can only get data of header of block
-			err = json.Unmarshal(blockBytes, &blockHeader)
+		if self.config.LightMode {
+			err = json.Unmarshal(blockBytes, &block)
 			if err != nil {
-				return nil, err
+				// with light node, block data can only contain block header
+				err = json.Unmarshal(blockBytes, &blockHeader)
+				if err != nil {
+					return nil, err
+				}
+				block.Header = blockHeader
 			}
-			block.Header = blockHeader
 		} else {
 			err = json.Unmarshal(blockBytes, &block)
 			if err != nil {
@@ -897,10 +891,20 @@ func (self *BlockChain) ProcessCrowdsaleTxs(block *Block) error {
 }
 
 // CreateAndSaveTxViewPointFromBlock - fetch data from block, put into txviewpoint variable and save into db
+// need to check light or not light mode
+// with light mode - node only fetch outputcoins of account in local wallet -> smaller data
+// with not light mode - node fetch all outputcoins of all accounts in network -> big data
+// (note: still storage full data of commitments, serialnumbersm snderivator to check double spend)
 func (self *BlockChain) CreateAndSaveTxViewPointFromBlock(block *Block) error {
 	// Fetch data from block into tx View point
 	view := NewTxViewPoint(block.Header.ChainID)
-	err := view.fetchTxViewPointFromBlock(self.config.DataBase, block)
+	var err error
+	if !self.config.LightMode {
+		// skip local wallet -> store full data
+		err = view.fetchTxViewPointFromBlock(self.config.DataBase, block, nil)
+	} else {
+		err = view.fetchTxViewPointFromBlock(self.config.DataBase, block, self.config.Wallet)
+	}
 	if err != nil {
 		return err
 	}
@@ -924,10 +928,9 @@ func (self *BlockChain) CreateAndSaveTxViewPointFromBlock(block *Block) error {
 		// save tx which relate to custom token
 		// Reject Double spend UTXO before enter this state
 		err = self.StoreCustomTokenPaymentAddresstHistory(customTokenTx)
-		// TODO: detect/cactch/revert/skip double spend tx
 		if err != nil {
 			// Skip double spend
-			continue
+			return err
 		}
 		err = self.config.DataBase.StoreCustomTokenTx(&customTokenTx.TxTokenData.PropertyID, block.Header.ChainID, block.Header.Height, indexTx, customTokenTx.Hash()[:])
 		if err != nil {
@@ -1077,7 +1080,6 @@ func (self *BlockChain) StoreCustomTokenPaymentAddresstHistory(customTokenTx *tr
 		}
 	}
 	return nil
-	//return self.config.DataBase.StoreCustomTokenPaymentAddresstHistory(&customTokenTx.TxTokenData.PropertyID, customTokenTx)
 }
 
 // DecryptTxByKey - process outputcoin to get outputcoin data which relate to keyset
@@ -1105,7 +1107,8 @@ func (self *BlockChain) DecryptOutputCoinByKey(outCoinTemp *privacy.OutputCoin, 
 		}
 		if len(keySet.PrivateKey) > 0 {
 			// check spent with private-key
-			result.CoinDetails.SerialNumber = privacy.Eval(new(big.Int).SetBytes(keySet.PrivateKey), result.CoinDetails.SNDerivator)
+			result.CoinDetails.SerialNumber = privacy.Eval(new(big.Int).SetBytes(keySet.PrivateKey),
+				result.CoinDetails.SNDerivator, privacy.PedCom.G[privacy.SK])
 			ok, err := self.config.DataBase.HasSerialNumber(tokenID, result.CoinDetails.SerialNumber.Compress(), chainID)
 			if ok || err != nil {
 				return nil
@@ -1130,12 +1133,7 @@ func (self *BlockChain) GetListOutputCoinsByKeyset(keyset *cashec.KeySet, chainI
 	self.chainLock.Lock()
 	defer self.chainLock.Unlock()
 
-	if self.config.Light {
-		// Get unspent tx with light mode
-		// TODO
-	}
 	// get list outputcoin of pubkey from db
-
 	outCointsInBytes, err := self.config.DataBase.GetOutcoinsByPubkey(tokenID, keyset.PaymentAddress.Pk[:], chainID)
 	if err != nil {
 		return nil, err
@@ -1270,74 +1268,16 @@ func (self *BlockChain) GetUnspentTxCustomTokenVout(receiverKeyset cashec.KeySet
 	return voutList, nil
 }
 
-func (self *BlockChain) GetTransactionByHashInLightMode(txHash *common.Hash) (byte, *common.Hash, int, metadata.Transaction, error) {
-	const (
-		bigNumber   = 999999999
-		bigNumberTx = 999999999
-	)
-	var (
-		blockHeight uint32
-		txIndex     uint32
-		chainId     []byte
-	)
-	// Get transaction
-	tx := transaction.Tx{}
-	locationByte, txByte, err := self.config.DataBase.GetTransactionLightModeByHash(txHash)
-	Logger.log.Info("GetTransactionByHash - 1", locationByte, txByte, err)
-	if err != nil {
-		return byte(255), nil, -1, nil, err
-	}
-	err = json.Unmarshal(txByte, &tx)
-	if err != nil {
-		return byte(255), nil, -1, nil, err
-	}
-	// Handle string to get chainId, blockheight, txindex information
-	locations := strings.Split(string(locationByte), string("-"))
-	// Get Chain Id
-	chainId = []byte(locations[2])
-	// Get Block Height
-	tempBlockHeight := []byte(locations[3])
-	bufBlockHeight := bytes.NewBuffer(tempBlockHeight)
-	err = binary.Read(bufBlockHeight, binary.LittleEndian, &blockHeight)
-	if err != nil {
-		return byte(255), nil, -1, nil, err
-	}
-	blockHeight = uint32(bigNumber - blockHeight)
-	Logger.log.Info("Testing in GetTransactionByHash, blockHeight", blockHeight)
-	block, err := self.GetBlockByBlockHeight(int32(blockHeight), chainId[0])
-	if err != nil {
-		Logger.log.Error("ERROR in GetTransactionByHash, get Block by height", err)
-		return byte(255), nil, -1, nil, err
-	}
-	//Get txIndex
-	tempTxIndex := []byte(locations[4])
-	bufTxIndex := bytes.NewBuffer(tempTxIndex)
-	err = binary.Read(bufTxIndex, binary.LittleEndian, &txIndex)
-	if err != nil {
-		return byte(255), nil, -1, nil, err
-	}
-	txIndex = uint32(bigNumberTx - txIndex)
-	Logger.log.Info("Testing in GetTransactionByHash, blockHash, index, tx", block.Hash(), txIndex, tx)
-	return chainId[0], block.Hash(), int(txIndex), &tx, nil
-}
-
-// GetTransactionByHash - retrieve tx from TxId(txHash)
+// GetTransactionByHash - retrieve tx from txId(txHash)
 func (self *BlockChain) GetTransactionByHash(txHash *common.Hash) (byte, *common.Hash, int, metadata.Transaction, error) {
 	blockHash, index, err := self.config.DataBase.GetTransactionIndexById(txHash)
 	if err != nil {
-		// check lightweight
-		if self.config.Light {
-			// with light node, we can try get data in light mode
-			Logger.log.Info("ERROR in GetTransactionByHash, change to get in light mode", err)
-			return self.GetTransactionByHashInLightMode(txHash)
-		}
-
 		return byte(255), nil, -1, nil, err
 	}
 	block, err := self.GetBlockByBlockHash(blockHash)
 	if err != nil {
 		Logger.log.Errorf("ERROR", err, "NO Transaction in block with hash &+v", blockHash, "and index", index, "contains", block.Transactions[index])
-		return byte(255), nil, -1, nil, err
+		return byte(255), nil, -1, nil, NewBlockChainError(UnExpectedError, err)
 	}
 	Logger.log.Infof("Transaction in block with hash &+v", blockHash, "and index", index, "contains", block.Transactions[index])
 	return block.Header.ChainID, blockHash, index, block.Transactions[index], nil
@@ -1367,7 +1307,7 @@ func (self *BlockChain) ListCustomToken() (map[common.Hash]transaction.TxCustomT
 		_ = blockHash
 		_ = index
 		if err != nil {
-			return nil, err
+			return nil, NewBlockChainError(UnExpectedError, err)
 		}
 		txCustomToken := tx.(*transaction.TxCustomToken)
 		result[txCustomToken.TxTokenData.PropertyID] = *txCustomToken

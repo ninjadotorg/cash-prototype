@@ -1,11 +1,19 @@
 package common
 
 const (
+<<<<<<< HEAD
 	EmptyString         = ""
 	NanoConstant        = 2 // 1 constant = 10^2 nano constant, we will use 1 miliconstant as minimum unit constant in tx
 	IncMerkleTreeHeight = 29
 	RefundPeriod        = 1000 // after 1000 blocks since a tx (small & no-privacy) happens, the network will refund an amount of constants to tx initiator automatically
 	PubKeyLength        = 33
+=======
+	EmptyString  = ""
+	TrueValue    = true
+	FalseValue   = false
+	NanoConstant = 2    // 1 constant = 10^2 nano constant, we will use 1 miliconstant as minimum unit constant in tx
+	RefundPeriod = 1000 // after 1000 blocks since a tx (small & no-privacy) happens, the network will refund an amount of constants to tx initiator automatically
+>>>>>>> origin/master
 )
 
 const (
@@ -73,5 +81,5 @@ var (
 const (
 	DCBAddress     = "1Uv3jP4ixNx3BkEtmUUxKXA1TXUduix3KMCWXHvLqVyA9CFfoLRZ949zTBNqDUPSzaPCZPrQKSfiEHguFazK6VeDmEk1RMLfX1kQiSqJ6"
 	GOVAddress     = "1Uv3jP4ixNx3BkEtmUUxKXA1TXUduix3KMCWXHvLqVyA9CFfoLRZ949zTBNqDUPSzaPCZPrQKSfiEHguFazK6VeDmEk1RMLfX1kQiSqJ6"
-	BurningAddress = ""
+	BurningAddress = "1UuyVqB8YeYfTHJEmA1BBYSupdbrejr1ZAusnwSUuohUFZYmD6Q8b1C7mtk9ydN2GAY7ebSDyMcB1om8DJKbDRRW3QbGNhkyoLfYo9wcQ"
 )

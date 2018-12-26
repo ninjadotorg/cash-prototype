@@ -11,7 +11,7 @@ import (
 	"github.com/ninjadotorg/constant/common"
 	"github.com/ninjadotorg/constant/database"
 	"github.com/ninjadotorg/constant/metadata"
-	"github.com/ninjadotorg/constant/privacy-protocol"
+	"github.com/ninjadotorg/constant/privacy"
 	"github.com/ninjadotorg/constant/transaction"
 	"github.com/ninjadotorg/constant/voting"
 	"github.com/ninjadotorg/constant/wallet"
@@ -98,6 +98,7 @@ func (blockgen *BlkTmplGenerator) NewBlockTemplate(payToAddress *privacy.Payment
 	var txToRemove []metadata.Transaction
 	var buySellReqTxs []metadata.Transaction
 	var issuingReqTxs []metadata.Transaction
+	var updatingOracleBoardTxs []metadata.Transaction
 	var buyBackFromInfos []*buyBackFromInfo
 	bondsSold := uint64(0)
 	dcbTokensSold := uint64(0)
@@ -135,7 +136,7 @@ func (blockgen *BlkTmplGenerator) NewBlockTemplate(payToAddress *privacy.Payment
 		}
 		// ValidateTransaction vote and propose transaction
 
-		// TODO: need to determine a tx is in privacy format or not
+		// TODO: 0xbunyip need to determine a tx is in privacy format or not
 		if !tx.ValidateTxByItself(tx.IsPrivacy(), blockgen.chain.config.DataBase, blockgen.chain, chainID) {
 			txToRemove = append(txToRemove, metadata.Transaction(tx))
 			continue
@@ -214,13 +215,20 @@ func (blockgen *BlkTmplGenerator) NewBlockTemplate(payToAddress *privacy.Payment
 				continue
 			}
 		case metadata.IssuingRequestMeta:
-			addable, newDCBTokensSold := blockgen.checkIssuingReqTx(chainID, tx, dcbTokensSold)
-			dcbTokensSold = newDCBTokensSold
-			if !addable {
-				txToRemove = append(txToRemove, tx)
-				continue
+			{
+				addable, newDCBTokensSold := blockgen.checkIssuingReqTx(chainID, tx, dcbTokensSold)
+				dcbTokensSold = newDCBTokensSold
+				if !addable {
+					txToRemove = append(txToRemove, tx)
+					continue
+				}
+				issuingReqTxs = append(issuingReqTxs, tx)
 			}
-			issuingReqTxs = append(issuingReqTxs, tx)
+
+		case metadata.UpdatingOracleBoardMeta:
+			{
+				updatingOracleBoardTxs = append(updatingOracleBoardTxs, tx)
+			}
 		}
 
 		totalFee += tx.GetTxFee()
@@ -286,7 +294,8 @@ concludeBlock:
 	// ------------------------------------------------------------------------
 	totalSalary := salaryMULTP*salaryPerTx + basicSalary
 	// create salary tx to pay constant for block producer
-	salaryTx, err := transaction.CreateTxSalary(totalSalary, payToAddress, privatekey, blockgen.chain.config.DataBase)
+	salaryTx := new(transaction.Tx)
+	err = salaryTx.InitTxSalary(totalSalary, payToAddress, privatekey, blockgen.chain.config.DataBase)
 	if err != nil {
 		Logger.log.Error(err)
 		return nil, err
@@ -307,22 +316,18 @@ concludeBlock:
 		return nil, err
 	}
 
+	oracleRewardTxs, totalOracleRewards, updatedOracleValues, err := blockgen.buildOracleRewardTxs(chainID, privatekey)
+	if err != nil {
+		Logger.log.Error(err)
+		return nil, err
+	}
+
 	// create refund txs
 	currentSalaryFund := prevBlock.Header.SalaryFund
-	remainingFund := currentSalaryFund + totalFee + salaryFundAdd + incomeFromBonds - (totalSalary + buyBackCoins)
+	remainingFund := currentSalaryFund + totalFee + salaryFundAdd + incomeFromBonds - (totalSalary + buyBackCoins + totalOracleRewards)
 	refundTxs, totalRefundAmt := blockgen.buildRefundTxs(chainID, remainingFund, privatekey)
 
 	issuingResTxs, err := blockgen.buildIssuingResTxs(chainID, issuingReqTxs, privatekey)
-	if err != nil {
-		Logger.log.Error(err)
-		return nil, err
-	}
-	evals, err := blockgen.updateOracleValues()
-	if err != nil {
-		Logger.log.Error(err)
-		return nil, err
-	}
-	oracleRewardTxs, totalOracleRewards, err := blockgen.buildOracleRewardTxs(evals, chainID, privatekey)
 	if err != nil {
 		Logger.log.Error(err)
 		return nil, err
@@ -450,8 +455,9 @@ concludeBlock:
 		ChainID:            chainID,
 		SalaryFund:         currentSalaryFund + incomeFromBonds + totalFee + salaryFundAdd - totalSalary - govPayoutAmount - buyBackCoins - totalRefundAmt - totalOracleRewards,
 		BankFund:           prevBlock.Header.BankFund + loanPaymentAmount - bankPayoutAmount,
-		GOVConstitution:    prevBlock.Header.GOVConstitution, // TODO: need get from gov-params tx
-		DCBConstitution:    prevBlock.Header.DCBConstitution, // TODO: need get from dcb-params tx
+		GOVConstitution:    prevBlock.Header.GOVConstitution, // TODO: 0xbunyip need get from gov-params tx
+		DCBConstitution:    prevBlock.Header.DCBConstitution, // TODO: 0xbunyip need get from dcb-params tx
+		Oracle:             prevBlock.Header.Oracle,
 	}
 	if block.Header.GOVConstitution.GOVParams.SellingBonds != nil {
 		block.Header.GOVConstitution.GOVParams.SellingBonds.BondsToSell -= bondsSold
@@ -460,7 +466,13 @@ concludeBlock:
 		block.Header.DCBConstitution.DCBParams.SaleDBCTOkensByUSDData.Amount -= dcbTokensSold
 	}
 
-	//Change block header by tx inside it's transaction
+	blockgen.updateOracleValues(&block, updatedOracleValues)
+	err = blockgen.updateOracleBoard(&block, updatingOracleBoardTxs)
+	if err != nil {
+		Logger.log.Error(err)
+		return nil, err
+	}
+
 	for _, tx := range txsToAdd {
 		if err := block.AddTransaction(tx); err != nil {
 			return nil, err
@@ -559,7 +571,7 @@ func (blockgen *BlkTmplGenerator) processDividend(
 			if err != nil {
 				return nil, 0, err
 			}
-			holderAddress := (&privacy.PaymentAddress{}).FromBytes(holderAddr)
+			holderAddress := (&privacy.PaymentAddress{}).SetBytes(holderAddr)
 			info := metadata.DividendInfo{
 				TokenHolder: *holderAddress,
 				Amount:      amounts[i] / totalTokenSupply,
@@ -746,7 +758,8 @@ func (blockgen *BlkTmplGenerator) buildBuyBackResponseTxs(
 	var buyBackResTxs []*transaction.Tx
 	for _, buyBackFromInfo := range buyBackFromInfos {
 		buyBackAmount := buyBackFromInfo.value * buyBackFromInfo.buyBackPrice
-		buyBackResTx, err := transaction.CreateTxSalary(buyBackAmount, &buyBackFromInfo.paymentAddress, privatekey, blockgen.chain.GetDatabase())
+		buyBackResTx := new(transaction.Tx)
+		err := buyBackResTx.InitTxSalary(buyBackAmount, &buyBackFromInfo.paymentAddress, privatekey, blockgen.chain.GetDatabase())
 		if err != nil {
 			return []*transaction.Tx{}, err
 		}
@@ -834,7 +847,8 @@ func (blockgen *BlkTmplGenerator) buildIssuingResTxs(
 				constantPrice = oracleParams.Constant
 			}
 			issuingAmt := issuingReq.DepositedAmount / constantPrice
-			resTx, err := transaction.CreateTxSalary(issuingAmt, &issuingReq.ReceiverAddress, privatekey, blockgen.chain.GetDatabase())
+			resTx := new(transaction.Tx)
+			err := resTx.InitTxSalary(issuingAmt, &issuingReq.ReceiverAddress, privatekey, blockgen.chain.GetDatabase())
 			if err != nil {
 				return []metadata.Transaction{}, err
 			}
@@ -864,7 +878,8 @@ func calculateAmountOfRefundTxs(
 	var refundTxs []*transaction.Tx
 	for i := 0; i < len(addresses); i++ {
 		addr := addresses[i]
-		refundTx, err := transaction.CreateTxSalary(actualRefundAmt, addr, privatekey, db)
+		refundTx := new(transaction.Tx)
+		err := refundTx.InitTxSalary(actualRefundAmt, addr, privatekey, db)
 		if err != nil {
 			Logger.log.Error(err)
 			continue
